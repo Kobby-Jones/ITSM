@@ -36,10 +36,12 @@ class AppColors {
 
   // Status colors
   static const statusOpen = Color(0xFF3B82F6);
+  static const statusAssigned = Color(0xFF0EA5E9);
   static const statusInProgress = Color(0xFF8B5CF6);
   static const statusOnHold = Color(0xFFF59E0B);
   static const statusResolved = Color(0xFF10B981);
   static const statusClosed = Color(0xFF6B7280);
+  static const statusEscalated = Color(0xFFDC2626);
 
   // Chart palette
   static const chart1 = Color(0xFF6366F1);

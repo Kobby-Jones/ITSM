@@ -6,7 +6,8 @@ import 'package:uuid/uuid.dart';
 import '../models/ticket.dart';
 import '../models/user.dart';
 import '../models/user_role.dart';
-import '../features/tickets/mock_ticket_data.dart';
+import '../services/tickets_service.dart';
+import '../services/sync_service.dart';
 import '../theme/app_colors.dart';
 import 'auth_provider.dart';
 import 'connectivity_provider.dart';
@@ -62,10 +63,41 @@ class TicketFilters {
 
 enum TicketScope { all, mine, assignedToMe, unassigned, openOnly }
 
-class TicketsController extends StateNotifier<List<Ticket>> {
-  TicketsController() : super(MockTicketData.generate());
+enum TicketsLoadState { loading, loaded, error, offlineCached }
 
+/// Backed by [TicketsService] (real `/tickets` API + offline cache/queue).
+///
+/// Writes are applied optimistically to local state immediately (so the UI
+/// feels instant) and fired off to the backend in the background; if the
+/// device is offline, [TicketsService] transparently queues the write via
+/// [SyncQueueService] instead of throwing. This mirrors the previous
+/// mock-data version's synchronous feel while actually talking to the API.
+class TicketsController extends StateNotifier<List<Ticket>> {
+  TicketsController(this._ref) : super(const []) {
+    load();
+  }
+
+  final Ref _ref;
   final _uuid = const Uuid();
+
+  TicketsLoadState loadState = TicketsLoadState.loading;
+  String? loadError;
+
+  Future<void> load() async {
+    loadState = TicketsLoadState.loading;
+    try {
+      final tickets = await TicketsService.instance.getTickets();
+      state = tickets;
+      loadState = TicketsLoadState.loaded;
+    } catch (e) {
+      loadError = e.toString();
+      loadState = TicketsLoadState.error;
+    }
+    // Trigger a rebuild of anything watching ticketsLoadStateProvider.
+    _ref.invalidate(ticketsLoadStateProvider);
+  }
+
+  Future<void> refresh() => load();
 
   Ticket? byId(String id) {
     for (final t in state) {
@@ -74,97 +106,116 @@ class TicketsController extends StateNotifier<List<Ticket>> {
     return null;
   }
 
-  void updateStatus(String id, TicketStatus status, {String? actor}) {
-    final now = DateTime.now();
+  void _replace(String id, Ticket Function(Ticket) update) {
     state = [
       for (final t in state)
-        if (t.id == id || t.code == id)
-          t.copyWith(
-            status: status,
-            updatedAt: now,
-            events: [
-              ...t.events,
-              TicketEvent(
-                id: 'evt-${_uuid.v4()}',
-                title: 'Status → ${status.label}',
-                description: 'Updated by ${actor ?? 'system'}',
-                timestamp: now,
-                icon: status.icon,
-                color: status.color,
-                actor: actor,
-              ),
-            ],
-          )
-        else
-          t,
+        if (t.id == id || t.code == id) update(t) else t,
     ];
+  }
+
+  void updateStatus(String id, TicketStatus status, {String? actor}) {
+    final now = DateTime.now();
+    _replace(
+      id,
+      (t) => t.copyWith(
+        status: status,
+        updatedAt: now,
+        events: [
+          ...t.events,
+          TicketEvent(
+            id: 'evt-${_uuid.v4()}',
+            title: 'Status → ${status.label}',
+            description: 'Updated by ${actor ?? 'system'}',
+            timestamp: now,
+            icon: status.icon,
+            color: status.color,
+            actor: actor,
+          ),
+        ],
+      ),
+    );
+    TicketsService.instance.updateStatus(id, status).catchError((_) {
+      // Optimistic update already applied; a background retry happens via
+      // the sync queue if this was a connectivity failure. Non-network
+      // errors (e.g. permission denied) are swallowed here rather than
+      // silently reverting — surfacing them well would need a dedicated
+      // error-toast channel, a good next step.
+      return TicketsService.instance.getTicketById(id).catchError((_) => byId(id)!);
+    });
   }
 
   void assign(String id, {required String assigneeId, required String assigneeName, String? actor}) {
     final now = DateTime.now();
-    state = [
-      for (final t in state)
-        if (t.id == id || t.code == id)
-          t.copyWith(
-            assigneeId: assigneeId,
-            assigneeName: assigneeName,
-            updatedAt: now,
-            events: [
-              ...t.events,
-              TicketEvent(
-                id: 'evt-${_uuid.v4()}',
-                title: 'Assigned to $assigneeName',
-                description: 'Manual assignment by ${actor ?? 'system'}',
-                timestamp: now,
-                icon: Icons.assignment_ind_rounded,
-                color: AppColors.statusInProgress,
-                actor: actor,
-              ),
-            ],
-          )
-        else
-          t,
-    ];
+    _replace(
+      id,
+      (t) => t.copyWith(
+        assigneeId: assigneeId,
+        assigneeName: assigneeName,
+        updatedAt: now,
+        events: [
+          ...t.events,
+          TicketEvent(
+            id: 'evt-${_uuid.v4()}',
+            title: 'Assigned to $assigneeName',
+            description: 'Manual assignment by ${actor ?? 'system'}',
+            timestamp: now,
+            icon: Icons.assignment_ind_rounded,
+            color: AppColors.statusInProgress,
+            actor: actor,
+          ),
+        ],
+      ),
+    );
+    TicketsService.instance.assign(id, assigneeId).catchError((_) => byId(id)!);
   }
 
   void addComment(String id, {required AppUser author, required String content, bool internal = false}) {
     final now = DateTime.now();
-    state = [
-      for (final t in state)
-        if (t.id == id || t.code == id)
-          t.copyWith(
-            comments: [
-              ...t.comments,
-              Comment(
-                id: 'cmt-${_uuid.v4()}',
-                authorName: author.name,
-                authorRole: author.role.label,
-                content: content,
-                createdAt: now,
-                isInternal: internal,
-              ),
-            ],
-            updatedAt: now,
-            events: [
-              ...t.events,
-              TicketEvent(
-                id: 'evt-${_uuid.v4()}',
-                title: '${author.name} commented',
-                description: internal ? 'Internal note added' : content.length > 60 ? '${content.substring(0, 60)}…' : content,
-                timestamp: now,
-                icon: Icons.comment_rounded,
-                color: AppColors.info,
-                actor: author.name,
-              ),
-            ],
-          )
-        else
-          t,
-    ];
+    _replace(
+      id,
+      (t) => t.copyWith(
+        comments: [
+          ...t.comments,
+          Comment(
+            id: 'cmt-${_uuid.v4()}',
+            authorName: author.name,
+            authorRole: author.role.label,
+            content: content,
+            createdAt: now,
+            isInternal: internal,
+          ),
+        ],
+        updatedAt: now,
+        events: [
+          ...t.events,
+          TicketEvent(
+            id: 'evt-${_uuid.v4()}',
+            title: '${author.name} commented',
+            description:
+                internal ? 'Internal note added' : content.length > 60 ? '${content.substring(0, 60)}…' : content,
+            timestamp: now,
+            icon: Icons.comment_rounded,
+            color: AppColors.info,
+            actor: author.name,
+          ),
+        ],
+      ),
+    );
+    TicketsService.instance.addComment(id, content, isInternal: internal).catchError((_) => Comment(
+          id: 'pending',
+          authorName: author.name,
+          authorRole: author.role.label,
+          content: content,
+          createdAt: now,
+          isInternal: internal,
+        ));
   }
 
-  /// Submit a new ticket. If offline, marks as pending sync.
-  Ticket submit({
+  /// Submits a new ticket. If offline, [TicketsService] queues it locally
+  /// and returns a placeholder marked [SyncState.pending] instead of
+  /// throwing — the caller (submit screen) doesn't need to branch on
+  /// connectivity itself.
+  Future<Ticket> submit({
     required AppUser reporter,
     required String title,
     required String description,
@@ -173,12 +224,12 @@ class TicketsController extends StateNotifier<List<Ticket>> {
     required TicketImpact impact,
     required bool isOnline,
     List<Attachment> attachments = const [],
-  }) {
+  }) async {
     final now = DateTime.now();
-    final code = 'INC-${1043 + state.length}';
-    final ticket = Ticket(
-      id: 't-${1043 + state.length}',
-      code: code,
+    final offlineId = _uuid.v4();
+    final draft = Ticket(
+      id: offlineId,
+      code: 'PENDING-${offlineId.substring(0, 6)}',
       title: title,
       description: description,
       priority: priority,
@@ -215,26 +266,30 @@ class TicketsController extends StateNotifier<List<Ticket>> {
           ),
       ],
     );
-    state = [ticket, ...state];
-    return ticket;
+
+    final result = await TicketsService.instance.createTicket(draft, offlineId: offlineId);
+    state = [result, ...state];
+    return result;
   }
 
-  /// Manually retry sync of a pending/failed ticket.
+  /// Manually retry syncing everything in the offline queue (not just one
+  /// ticket — the backend dedupes by `offlineId` so replaying is safe).
   Future<void> retrySync(String id) async {
-    state = [
-      for (final t in state)
-        if (t.id == id || t.code == id) t.copyWith(syncState: SyncState.syncing) else t,
-    ];
-    await Future.delayed(const Duration(seconds: 1));
-    state = [
-      for (final t in state)
-        if (t.id == id || t.code == id) t.copyWith(syncState: SyncState.synced) else t,
-    ];
+    _replace(id, (t) => t.copyWith(syncState: SyncState.syncing));
+    await SyncService.instance.processQueue();
+    await load();
   }
 }
 
 final ticketsProvider =
-    StateNotifierProvider<TicketsController, List<Ticket>>((ref) => TicketsController());
+    StateNotifierProvider<TicketsController, List<Ticket>>((ref) => TicketsController(ref));
+
+/// Non-breaking companion to [ticketsProvider] for screens that want to show
+/// a loading/error state instead of just an empty list on first load.
+final ticketsLoadStateProvider = Provider<TicketsLoadState>((ref) {
+  ref.watch(ticketsProvider); // rebuild when the list changes
+  return ref.read(ticketsProvider.notifier).loadState;
+});
 
 final ticketFiltersProvider = StateProvider<TicketFilters>((ref) => const TicketFilters());
 
@@ -319,16 +374,15 @@ final syncQueueTicketsProvider = Provider<List<Ticket>>((ref) {
     ..sort((a, b) => a.syncState.index.compareTo(b.syncState.index));
 });
 
-/// Used by some screens to mass-toggle sync after reconnection.
+/// Automatically flushes the offline write queue when connectivity comes
+/// back, then reloads tickets so synced items pick up their real server
+/// state (ids, ticket numbers, etc). Watch this provider once near the root
+/// of the authenticated shell (see `adaptive_shell.dart`) to activate it.
 final autoSyncProvider = Provider<void>((ref) {
-  // When connectivity comes back online, transition pending -> syncing -> synced.
   ref.listen<bool>(connectivityProvider, (prev, next) async {
     if (prev == false && next == true) {
-      final ctrl = ref.read(ticketsProvider.notifier);
-      final pending = ref.read(ticketsProvider).where((t) => t.syncState == SyncState.pending);
-      for (final t in pending) {
-        await ctrl.retrySync(t.id);
-      }
+      await SyncService.instance.processQueue();
+      await ref.read(ticketsProvider.notifier).load();
     }
   });
 });

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/brand_mark.dart';

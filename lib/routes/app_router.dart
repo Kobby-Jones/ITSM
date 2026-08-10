@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_underscores
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +61,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isSplash = loc == AppRoutes.splash;
 
       if (isSplash) return null;
+
+      if (auth.restoring) return AppRoutes.splash;
 
       if (!auth.isAuthenticated && !isAuthRoute) return AppRoutes.login;
       if (auth.isAuthenticated && isAuthRoute) return AppRoutes.home;

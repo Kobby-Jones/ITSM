@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,7 +52,7 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
 
     setState(() => _submitting = true);
     await Future.delayed(const Duration(milliseconds: 600));
-    final ticket = ref.read(ticketsProvider.notifier).submit(
+    final ticket = await ref.read(ticketsProvider.notifier).submit(
           reporter: user,
           title: _title.text.trim(),
           description: _desc.text.trim(),
@@ -330,11 +332,11 @@ class _OfflineNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.warning.withOpacity(0.3)),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.cloud_off_rounded, color: AppColors.warning, size: 20),
-          const SizedBox(width: 10),
-          const Expanded(
+          Icon(Icons.cloud_off_rounded, color: AppColors.warning, size: 20),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
               'You\'re currently offline. This ticket will be queued and synced automatically when you reconnect.',
               style: TextStyle(

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -292,7 +294,7 @@ class _Row extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
+                const Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
                 const SizedBox(width: 3),
                 Text(tech.customerSatisfaction.toStringAsFixed(1),
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
@@ -347,7 +349,7 @@ class _MobileCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.star_rounded, size: 16, color: AppColors.warning),
+                  const Icon(Icons.star_rounded, size: 16, color: AppColors.warning),
                   const SizedBox(width: 3),
                   Text(tech.customerSatisfaction.toStringAsFixed(1),
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),

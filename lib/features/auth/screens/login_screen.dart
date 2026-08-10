@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -125,12 +127,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 16),
             _DemoAccountsPanel(
-              onSelect: (email) {
-                _emailCtrl.text = email;
-                _passwordCtrl.text = 'demo1234';
-                setState(() {});
-              },
-            ),
+            onSelect: (email, password) {
+              _emailCtrl.text = email;
+              _passwordCtrl.text = password;
+              setState(() {});
+            },
+          ),
+
             const SizedBox(height: 24),
             Center(
               child: Wrap(
@@ -165,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 class _DemoAccountsPanel extends StatelessWidget {
-  final void Function(String email) onSelect;
+  final void Function(String email, String password) onSelect;
   const _DemoAccountsPanel({required this.onSelect});
 
   @override
@@ -201,7 +204,7 @@ class _DemoAccountsPanel extends StatelessWidget {
               email: a.email,
               role: a.role,
               name: a.name,
-              onTap: () => onSelect(a.email),
+             onTap: () => onSelect(a.email, a.password),
             ),
             if (a != accounts.last) const SizedBox(height: 6),
           ],

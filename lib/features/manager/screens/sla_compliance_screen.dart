@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -170,7 +172,7 @@ class SlaComplianceScreen extends ConsumerWidget {
                           color: AppColors.info,
                           dotData: FlDotData(
                             show: true,
-                            getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                            getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                               radius: 4,
                               color: spot.y >= 0.95 ? AppColors.success : AppColors.warning,
                               strokeWidth: 2,

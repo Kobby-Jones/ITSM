@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/storage/local_cache_service.dart';
+import 'core/storage/sync_queue_service.dart';
 import 'providers/theme_provider.dart';
 import 'routes/app_router.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+
+  // Storage must be ready before any provider that reads/writes it
+  // constructs (AuthController checks SecureStorageService synchronously
+  // via a Future at startup; Tickets/Assets/KB controllers read the offline
+  // cache). flutter_secure_storage needs no init call, but Hive does.
+  await LocalCacheService.init();
+  await SyncQueueService.init();
 
   runApp(const ProviderScope(child: ItsmApp()));
 }

@@ -37,6 +37,13 @@ class _TelemetryAnalysisScreenState extends ConsumerState<TelemetryAnalysisScree
         break;
       }
     }
+    // NOTE: still mock data. The backend's telemetry endpoints
+    // (`GET /telemetry/devices/:deviceId`) are keyed by device, not by
+    // ticket — there's no "device diagnostics for this specific ticket"
+    // endpoint today. Wiring this properly needs either a
+    // `ticket.deviceId -> GET /telemetry/devices/:deviceId` lookup (if the
+    // reporting device is known) or a backend addition that links telemetry
+    // to tickets directly.
     final tel = MockTelemetryData.forTicket(widget.ticketId);
     final isDesktop = Responsive.isDesktop(context);
 

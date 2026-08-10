@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -148,7 +150,7 @@ class _AssetsListScreenState extends ConsumerState<AssetsListScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.only(bottom: 24),
                         itemCount: assets.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (_, i) => _AssetRow(asset: assets[i]),
                       ),
           ),

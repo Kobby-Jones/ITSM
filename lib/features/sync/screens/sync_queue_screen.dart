@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -379,7 +381,7 @@ class _Row extends ConsumerWidget {
               )
             else if (ticket.syncState == SyncState.failed)
               IconButton(
-                icon: Icon(Icons.refresh_rounded, color: AppColors.danger),
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.danger),
                 tooltip: 'Retry',
                 onPressed: !online
                     ? null
@@ -390,7 +392,7 @@ class _Row extends ConsumerWidget {
               )
             else if (ticket.syncState == SyncState.pending && online)
               IconButton(
-                icon: Icon(Icons.cloud_upload_rounded, color: AppColors.warning),
+                icon: const Icon(Icons.cloud_upload_rounded, color: AppColors.warning),
                 tooltip: 'Sync now',
                 onPressed: () {
                   ref.read(ticketsProvider.notifier).retrySync(ticket.id);

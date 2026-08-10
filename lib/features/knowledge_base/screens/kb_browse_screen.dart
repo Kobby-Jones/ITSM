@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,7 +132,7 @@ class _KbBrowseScreenState extends ConsumerState<KbBrowseScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.only(bottom: 24),
                         itemCount: articles.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (_, i) => _ArticleCard(article: articles[i]),
                       ),
           ),
@@ -275,7 +277,7 @@ class _ArticleCard extends StatelessWidget {
                         color: context.colors.onSurface.withOpacity(0.6),
                       )),
                   const SizedBox(width: 14),
-                  Icon(Icons.thumb_up_rounded, size: 13, color: AppColors.success),
+                  const Icon(Icons.thumb_up_rounded, size: 13, color: AppColors.success),
                   const SizedBox(width: 4),
                   Text('${article.helpfulVotes}',
                       style: TextStyle(

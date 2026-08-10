@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_null_aware_elements
+
 import 'package:flutter/material.dart';
 import '../../core/extensions/context_extensions.dart';
 

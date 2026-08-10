@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,7 +37,7 @@ class TicketFilterSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
-            _SectionLabel('Scope'),
+            const _SectionLabel('Scope'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -48,7 +50,7 @@ class TicketFilterSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
-            _SectionLabel('Status'),
+            const _SectionLabel('Status'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -67,7 +69,7 @@ class TicketFilterSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
-            _SectionLabel('Priority'),
+            const _SectionLabel('Priority'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -86,7 +88,7 @@ class TicketFilterSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
-            _SectionLabel('Category'),
+            const _SectionLabel('Category'),
             Wrap(
               spacing: 8,
               runSpacing: 8,

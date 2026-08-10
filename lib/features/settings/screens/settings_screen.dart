@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -179,10 +181,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 titleIcon: Icons.info_outline_rounded,
                 child: Column(
                   children: [
-                    _InfoTile(label: 'Application', value: 'ITSM Framework'),
-                    _InfoTile(label: 'Version', value: '1.0.0 (build 142)'),
-                    _InfoTile(label: 'Tenant', value: 'Goldfields Ghana Ltd'),
-                    _InfoTile(label: 'Powered by', value: 'Deeptech AI'),
+                    const _InfoTile(label: 'Application', value: 'ITSM Framework'),
+                    const _InfoTile(label: 'Version', value: '1.0.0 (build 142)'),
+                    const _InfoTile(label: 'Tenant', value: 'Goldfields Ghana Ltd'),
+                    const _InfoTile(label: 'Powered by', value: 'Deeptech AI'),
                     _ActionTile(
                       icon: Icons.description_rounded,
                       title: 'Terms of Service',
@@ -279,7 +281,7 @@ class _ProfileCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(role,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,

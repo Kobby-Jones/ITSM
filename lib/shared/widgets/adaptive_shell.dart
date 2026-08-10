@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/tickets_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
 import 'brand_mark.dart';
@@ -195,6 +198,11 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
     final user = auth.user;
     if (user == null) return const SizedBox.shrink();
 
+    // Activates the connectivity listener that flushes the offline write
+    // queue as soon as the device comes back online (see
+    // `providers/tickets_provider.dart`).
+    ref.watch(autoSyncProvider);
+
     final destinations = _destinationsFor(user.role, ref.watch(unreadNotificationsCountProvider));
     final isMobile = Responsive.isMobile(context);
 
@@ -210,10 +218,10 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
     final width = _collapsed ? 76.0 : 250.0;
 
     return Shortcuts(
-      shortcuts: <ShortcutActivator, Intent>{
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): const _SearchIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): const _SearchIntent(),
-        const SingleActivator(LogicalKeyboardKey.slash): const _SearchIntent(),
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyK, control: true): _SearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true): _SearchIntent(),
+        SingleActivator(LogicalKeyboardKey.slash): _SearchIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{

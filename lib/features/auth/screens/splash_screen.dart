@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,22 +18,36 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _minDelayElapsed = false;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1400), () {
+    // Keep a small minimum splash duration for branding, but the actual
+    // navigation decision waits on real session restoration below rather
+    // than assuming it finished within a fixed timeout.
+    Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
-      final auth = ref.read(authProvider);
-      if (auth.isAuthenticated) {
-        context.go(AppRoutes.home);
-      } else {
-        context.go(AppRoutes.login);
-      }
+      setState(() => _minDelayElapsed = true);
+      _maybeNavigate();
     });
+  }
+
+  void _maybeNavigate() {
+    if (!_minDelayElapsed) return;
+    final auth = ref.read(authProvider);
+    if (auth.restoring) return; // still checking stored token; wait for the listener below
+    if (!mounted) return;
+    if (auth.isAuthenticated) {
+      context.go(AppRoutes.home);
+    } else {
+      context.go(AppRoutes.login);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (_, _) => _maybeNavigate());
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(

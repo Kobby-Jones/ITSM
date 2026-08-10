@@ -691,7 +691,7 @@ class _SlaCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _CardTitle(icon: Icons.timer_rounded, title: 'SLA'),
+              const _CardTitle(icon: Icons.timer_rounded, title: 'SLA'),
               const Spacer(),
               Text(
                 'Due ${Formatters.dateTime(ticket.slaDueAt)}',
@@ -874,6 +874,8 @@ class _TelemetryPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // NOTE: still mock data — see telemetry_analysis_screen.dart for why
+    // (backend telemetry is per-device, not per-ticket).
     final tel = MockTelemetryData.forTicket(ticket.id);
     return _Card(
       child: Column(

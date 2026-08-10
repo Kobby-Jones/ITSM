@@ -33,4 +33,26 @@ class AppUser {
     }
     return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
   }
+
+  /// Builds an [AppUser] from the `user` object returned by
+  /// `POST /auth/login`, `GET /auth/me`, or `GET /users/:id`.
+  factory AppUser.fromJson(Map<String, dynamic> json) {
+    final department = json['department'];
+    return AppUser(
+      id: json['id'] as String,
+      name: json['firstName'] != null
+          ? '${json['firstName']} ${json['lastName'] ?? ''}'.trim()
+          : (json['name'] as String? ?? ''),
+      email: json['email'] as String? ?? '',
+      department: department is Map
+          ? department['name'] as String? ?? ''
+          : (department as String? ?? ''),
+      position: json['roleName'] as String? ?? json['position'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      role: UserRole.fromApi(json['role'] as String?),
+      avatarInitials: null,
+      company: json['company'] as String? ?? 'ITSM Platform',
+      location: json['location'] as String? ?? '',
+    );
+  }
 }
