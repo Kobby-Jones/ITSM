@@ -20,8 +20,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController(text: 'tech@goldfields.gh');
-  final _passwordCtrl = TextEditingController(text: 'demo1234');
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _remember = true;
 
@@ -114,27 +114,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onPressed: _submit,
             ),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: Divider(color: context.colors.outline)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('or',
-                      style: TextStyle(color: context.colors.onSurface.withOpacity(0.5), fontSize: 12)),
-                ),
-                Expanded(child: Divider(color: context.colors.outline)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _DemoAccountsPanel(
-            onSelect: (email, password) {
-              _emailCtrl.text = email;
-              _passwordCtrl.text = password;
-              setState(() {});
-            },
-          ),
-
-            const SizedBox(height: 24),
             Center(
               child: Wrap(
                 children: [
@@ -167,106 +146,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 }
 
-class _DemoAccountsPanel extends StatelessWidget {
-  final void Function(String email, String password) onSelect;
-  const _DemoAccountsPanel({required this.onSelect});
 
-  @override
-  Widget build(BuildContext context) {
-    final accounts = AuthController.demoAccounts;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.colors.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.science_outlined, size: 16, color: context.colors.primary),
-              const SizedBox(width: 8),
-              const Text('Demo accounts',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              const Spacer(),
-              Text('any password',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.colors.onSurface.withOpacity(0.6),
-                  )),
-            ],
-          ),
-          const SizedBox(height: 10),
-          for (final a in accounts) ...[
-            _DemoAccountTile(
-              email: a.email,
-              role: a.role,
-              name: a.name,
-             onTap: () => onSelect(a.email, a.password),
-            ),
-            if (a != accounts.last) const SizedBox(height: 6),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DemoAccountTile extends StatelessWidget {
-  final String email;
-  final String role;
-  final String name;
-  final VoidCallback onTap;
-
-  const _DemoAccountTile({
-    required this.email,
-    required this.role,
-    required this.name,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  Text(email,
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          color: context.colors.onSurface.withOpacity(0.6))),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: context.colors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(role,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: context.colors.primary,
-                  )),
-            ),
-            const SizedBox(width: 6),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 12, color: context.colors.onSurface.withOpacity(0.4)),
-          ],
-        ),
-      ),
-    );
-  }
-}

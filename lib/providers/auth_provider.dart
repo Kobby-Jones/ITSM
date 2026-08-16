@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
+import '../core/storage/local_cache_service.dart';
 import '../core/storage/secure_storage_service.dart';
+import '../core/storage/sync_queue_service.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
@@ -40,12 +42,6 @@ class AuthState {
 }
 
 class AuthController extends StateNotifier<AuthState> {
-
-  static const List<({String email, String password, String role, String name})> demoAccounts = [
-    (email: 'superadmin@itsm.com', password: 'SuperAdmin@2024!', role: 'Super Admin', name: 'Super Admin'),
-    (email: 'technician@itsm.com', password: 'Technician@2024!', role: 'IT Technician', name: 'John Doe'),
-    (email: 'user@itsm.com', password: 'EndUser@2024!', role: 'End User', name: 'Jane Smith'),
-  ];
   AuthController() : super(const AuthState()) {
     // Wire ApiClient's "refresh failed" callback to force a logout so the
     // router redirects to /login instead of leaving stale UI on screen.
@@ -67,6 +63,7 @@ class AuthController extends StateNotifier<AuthState> {
     }
     try {
       final user = await AuthService.instance.fetchMe();
+      LocalCacheService.instance.setCurrentUser(user.id);
       state = AuthState(user: user, restoring: false);
     } catch (_) {
       await SecureStorageService.instance.clear();
@@ -78,6 +75,7 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(loading: true, clearError: true);
     try {
       final user = await AuthService.instance.login(email, password);
+      LocalCacheService.instance.setCurrentUser(user.id);
       state = AuthState(user: user, restoring: false);
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
@@ -137,6 +135,10 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Clear user-scoped local data BEFORE calling the API so a failed
+    // network call doesn't leave the cache intact for the next user.
+    await LocalCacheService.instance.clearCurrentUser();
+    await SyncQueueService.instance.clearAll();
     await AuthService.instance.logout();
     state = const AuthState(restoring: false);
   }

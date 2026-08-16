@@ -105,4 +105,8 @@ class SyncQueueService {
   }
 
   int get pendingCount => _requireBox.keys.length;
+
+  /// Wipe the entire queue — called at logout so the next user on a
+  /// shared device does not inherit queued operations.
+  Future<void> clearAll() => _requireBox.clear();
 }

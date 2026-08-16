@@ -155,19 +155,26 @@ class TicketEvent {
 
   static String _titleFor(String action) => switch (action) {
         'CREATED' => 'Ticket created',
-        'ASSIGN' => 'Assigned',
-        'RESOLVE' => 'Resolved',
-        'CLOSE' => 'Closed',
-        'ESCALATE' => 'Escalated',
+        'ASSIGNED' || 'ASSIGN' => 'Assigned',
+        'RESOLVED' || 'RESOLVE' => 'Resolved',
+        'CLOSED' || 'CLOSE' => 'Closed',
+        'ESCALATED' || 'ESCALATE' => 'Escalated',
+        'IN_PROGRESS' => 'In progress',
+        'PENDING' => 'Pending',
+        'OPEN' => 'Reopened',
+        'UPDATED' => 'Updated',
         _ => 'Updated',
       };
 
   static (IconData, Color) _iconAndColorFor(String action) => switch (action) {
         'CREATED' => (Icons.fiber_new_rounded, AppColors.statusOpen),
-        'ASSIGN' => (Icons.assignment_ind_rounded, AppColors.statusAssigned),
-        'RESOLVE' => (Icons.check_circle_rounded, AppColors.statusResolved),
-        'CLOSE' => (Icons.lock_rounded, AppColors.statusClosed),
-        'ESCALATE' => (Icons.arrow_upward_rounded, AppColors.statusEscalated),
+        'ASSIGNED' || 'ASSIGN' => (Icons.assignment_ind_rounded, AppColors.statusAssigned),
+        'RESOLVED' || 'RESOLVE' => (Icons.check_circle_rounded, AppColors.statusResolved),
+        'CLOSED' || 'CLOSE' => (Icons.lock_rounded, AppColors.statusClosed),
+        'ESCALATED' || 'ESCALATE' => (Icons.arrow_upward_rounded, AppColors.statusEscalated),
+        'IN_PROGRESS' => (Icons.play_circle_rounded, AppColors.statusInProgress),
+        'PENDING' => (Icons.pause_circle_rounded, AppColors.warning),
+        'OPEN' => (Icons.refresh_rounded, AppColors.statusOpen),
         _ => (Icons.update_rounded, AppColors.statusInProgress),
       };
 }

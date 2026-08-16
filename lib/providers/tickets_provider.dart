@@ -106,6 +106,21 @@ class TicketsController extends StateNotifier<List<Ticket>> {
     return null;
   }
 
+  /// Fetch a single ticket from the server by its id and merge it into
+  /// the in-memory list. This gives the detail screen fresh comments,
+  /// attachments, history and SLA data.
+  Future<Ticket> fetchById(String id) async {
+    final ticket = await TicketsService.instance.getTicketById(id);
+    // Replace the stale list version (if present) with the full detail.
+    final exists = state.any((t) => t.id == id || t.code == id);
+    if (exists) {
+      _replace(id, (_) => ticket);
+    } else {
+      state = [ticket, ...state];
+    }
+    return ticket;
+  }
+
   void _replace(String id, Ticket Function(Ticket) update) {
     state = [
       for (final t in state)

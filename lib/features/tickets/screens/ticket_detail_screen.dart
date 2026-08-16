@@ -34,6 +34,24 @@ class TicketDetailScreen extends ConsumerStatefulWidget {
 class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   final _commentCtrl = TextEditingController();
   bool _internalNote = false;
+  bool _loading = true;
+  String? _fetchError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTicket();
+  }
+
+  Future<void> _fetchTicket() async {
+    setState(() { _loading = true; _fetchError = null; });
+    try {
+      await ref.read(ticketsProvider.notifier).fetchById(widget.ticketId);
+    } catch (e) {
+      _fetchError = e.toString();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   void dispose() {
@@ -43,18 +61,21 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final tickets = ref.watch(ticketsProvider);
-    final ticket = tickets.firstWhere(
-      (t) => t.id == widget.ticketId || t.code == widget.ticketId,
-      orElse: () => tickets.first,
+    final ticket = tickets.cast<Ticket?>().firstWhere(
+      (t) => t!.id == widget.ticketId || t.code == widget.ticketId,
+      orElse: () => null,
     );
-    final ticketExists = tickets.any(
-        (t) => t.id == widget.ticketId || t.code == widget.ticketId);
-    if (!ticketExists) {
+
+    if (ticket == null) {
       return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'Ticket not found',
-        message: 'We couldn\'t find ticket "${widget.ticketId}".',
+        title: _fetchError != null ? 'Failed to load ticket' : 'Ticket not found',
+        message: _fetchError ?? 'We couldn\'t find ticket "${widget.ticketId}".',
         actionLabel: 'Back to tickets',
         onAction: () => context.go(AppRoutes.tickets),
       );

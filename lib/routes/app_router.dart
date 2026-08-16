@@ -33,6 +33,7 @@ import '../features/telemetry/screens/telemetry_analysis_screen.dart';
 import '../features/tickets/screens/submit_ticket_screen.dart';
 import '../features/tickets/screens/ticket_detail_screen.dart';
 import '../features/tickets/screens/tickets_list_screen.dart';
+import '../models/user_role.dart';
 import '../providers/auth_provider.dart';
 import '../shared/widgets/adaptive_shell.dart';
 import '../shared/widgets/placeholder_screen.dart';
@@ -66,6 +67,48 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (!auth.isAuthenticated && !isAuthRoute) return AppRoutes.login;
       if (auth.isAuthenticated && isAuthRoute) return AppRoutes.home;
+
+      // ── Role-based route guards ───────────────────────────────
+      if (auth.isAuthenticated && auth.user != null) {
+        final role = auth.user!.role;
+
+        // Admin-only routes
+        const adminRoutes = {
+          AppRoutes.userManagement,
+          AppRoutes.kbManagement,
+          AppRoutes.routingRules,
+          AppRoutes.slaConfig,
+        };
+        if (adminRoutes.contains(loc) &&
+            role != UserRole.admin &&
+            role != UserRole.manager) {
+          return AppRoutes.home;
+        }
+
+        // Manager-only routes
+        const managerRoutes = {
+          AppRoutes.analytics,
+          AppRoutes.kpiDashboard,
+          AppRoutes.technicianPerformance,
+          AppRoutes.slaCompliance,
+          AppRoutes.reports,
+        };
+        if (managerRoutes.contains(loc) &&
+            role != UserRole.manager &&
+            role != UserRole.admin) {
+          return AppRoutes.home;
+        }
+
+        // Technician+ routes (technician, admin, manager)
+        const techRoutes = {
+          AppRoutes.ticketQueue,
+          AppRoutes.slaMonitor,
+        };
+        if (techRoutes.contains(loc) && role == UserRole.endUser) {
+          return AppRoutes.home;
+        }
+      }
+
       return null;
     },
     routes: [
