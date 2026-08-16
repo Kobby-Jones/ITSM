@@ -42,4 +42,12 @@ class NotificationsService {
       throw ApiClient.instance.mapError(e);
     }
   }
+
+  Future<void> deleteNotification(String id) async {
+    try {
+      await _dio.delete(ApiEndpoints.notification(id));
+    } catch (e) {
+      throw ApiClient.instance.mapError(e);
+    }
+  }
 }

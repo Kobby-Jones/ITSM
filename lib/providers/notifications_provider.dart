@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
@@ -7,15 +9,22 @@ import '../services/notifications_service.dart';
 class NotificationsController extends StateNotifier<List<AppNotification>> {
   NotificationsController() : super(const []) {
     load();
+    // Poll every 60 seconds for new notifications (until push is wired).
+    _pollTimer = Timer.periodic(const Duration(seconds: 60), (_) => load());
+  }
+
+  Timer? _pollTimer;
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> load() async {
     try {
       state = await NotificationsService.instance.getNotifications();
-    } catch (_) {
-      // Keep last-known state (possibly empty) rather than throwing in the
-      // UI tree; the bell icon just won't update until the next load().
-    }
+    } catch (_) {}
   }
 
   Future<void> refresh() => load();
@@ -33,6 +42,11 @@ class NotificationsController extends StateNotifier<List<AppNotification>> {
   void markAllRead() {
     state = [for (final n in state) n.copyWith(read: true)];
     NotificationsService.instance.markAllRead().catchError((_) {});
+  }
+
+  void delete(String id) {
+    state = state.where((n) => n.id != id).toList();
+    NotificationsService.instance.deleteNotification(id).catchError((_) {});
   }
 
   int get unreadCount => state.where((n) => !n.read).length;

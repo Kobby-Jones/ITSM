@@ -102,10 +102,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         ),
                         child: ListView.builder(
                           itemCount: filtered.length,
-                          itemBuilder: (_, i) => _NotificationRow(
-                            notification: filtered[i],
-                            isLast: i == filtered.length - 1,
-                          ).animate(delay: (i * 18).ms).fadeIn(duration: 200.ms),
+                          itemBuilder: (_, i) {
+                            final n = filtered[i];
+                            return Dismissible(
+                              key: ValueKey(n.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 24),
+                                color: Colors.red.withOpacity(0.15),
+                                child: const Icon(Icons.delete_rounded, color: Colors.red),
+                              ),
+                              onDismissed: (_) {
+                                ref.read(notificationsProvider.notifier).delete(n.id);
+                              },
+                              child: _NotificationRow(
+                                notification: n,
+                                isLast: i == filtered.length - 1,
+                              ).animate(delay: (i * 18).ms).fadeIn(duration: 200.ms),
+                            );
+                          },
                         ),
                       ),
               ),

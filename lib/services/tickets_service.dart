@@ -76,8 +76,15 @@ class TicketsService {
   /// and returns a client-side placeholder [Ticket] marked
   /// [SyncState.pending] instead of throwing, so the submit flow always
   /// feels successful and the write survives an app restart.
-  Future<Ticket> createTicket(Ticket draft, {required String offlineId}) async {
+  Future<Ticket> createTicket(
+    Ticket draft, {
+    required String offlineId,
+    Map<String, dynamic>? telemetry,
+  }) async {
     final payload = draft.toCreatePayload(offlineId: offlineId);
+    if (telemetry != null) {
+      payload['telemetry'] = telemetry;
+    }
     try {
       final res = await _dio.post(ApiEndpoints.tickets, data: payload);
       return Ticket.fromJson(res.data['data'] as Map<String, dynamic>);

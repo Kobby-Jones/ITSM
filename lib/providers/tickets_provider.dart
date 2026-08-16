@@ -259,6 +259,7 @@ class TicketsController extends StateNotifier<List<Ticket>> {
     required TicketImpact impact,
     required bool isOnline,
     List<Attachment> attachments = const [],
+    Map<String, dynamic>? telemetry,
   }) async {
     final now = DateTime.now();
     final offlineId = _uuid.v4();
@@ -302,7 +303,11 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       ],
     );
 
-    final result = await TicketsService.instance.createTicket(draft, offlineId: offlineId);
+    final result = await TicketsService.instance.createTicket(
+      draft,
+      offlineId: offlineId,
+      telemetry: telemetry,
+    );
     state = [result, ...state];
     return result;
   }

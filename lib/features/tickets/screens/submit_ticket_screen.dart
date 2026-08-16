@@ -12,6 +12,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/connectivity_provider.dart';
 import '../../../providers/tickets_provider.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/telemetry_collection_service.dart';
 import '../../../shared/widgets/gradient_button.dart';
 import '../../../theme/app_colors.dart';
 
@@ -76,6 +77,15 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
     final isOnline = ref.read(connectivityProvider);
 
     setState(() => _submitting = true);
+
+    // Collect device telemetry if the user opted in.
+    Map<String, dynamic>? telemetryData;
+    if (_includeTelemetry) {
+      final snapshot =
+          await TelemetryCollectionService.instance.collectSnapshot();
+      telemetryData = snapshot?.toJson();
+    }
+
     final ticket = await ref.read(ticketsProvider.notifier).submit(
           reporter: user,
           title: _title.text.trim(),
@@ -85,6 +95,7 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
           impact: _impact,
           isOnline: isOnline,
           attachments: List.of(_attachments),
+          telemetry: telemetryData,
         );
     if (!mounted) return;
     setState(() => _submitting = false);

@@ -52,4 +52,41 @@ class KbService {
       throw ApiClient.instance.mapError(e);
     }
   }
+
+  Future<KbArticle> createArticle({
+    required String title,
+    required String content,
+    required String category,
+    String? summary,
+    List<String> tags = const [],
+  }) async {
+    try {
+      final res = await _dio.post(ApiEndpoints.kbArticles, data: {
+        'title': title,
+        'content': content,
+        'category': category,
+        'summary': ?summary,
+        if (tags.isNotEmpty) 'tags': tags,
+      });
+      return KbArticle.fromJson(res.data['data'] as Map<String, dynamic>);
+    } catch (e) {
+      throw ApiClient.instance.mapError(e);
+    }
+  }
+
+  Future<void> updateArticle(String id, Map<String, dynamic> data) async {
+    try {
+      await _dio.patch(ApiEndpoints.kbArticle(id), data: data);
+    } catch (e) {
+      throw ApiClient.instance.mapError(e);
+    }
+  }
+
+  Future<void> deleteArticle(String id) async {
+    try {
+      await _dio.delete(ApiEndpoints.kbArticle(id));
+    } catch (e) {
+      throw ApiClient.instance.mapError(e);
+    }
+  }
 }
