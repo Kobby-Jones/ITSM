@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,6 +34,30 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
   bool _submitting = false;
 
   final _attachments = <Attachment>[];
+  final _pickedFiles = <PlatformFile>[];
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
+    if (result == null) return;
+    for (final file in result.files) {
+      _pickedFiles.add(file);
+      _attachments.add(Attachment(
+        name: file.name,
+        size: _formatSize(file.size),
+        icon: Icons.attach_file_rounded,
+      ));
+    }
+    setState(() {});
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 
   @override
   void dispose() {
@@ -51,7 +76,6 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
     final isOnline = ref.read(connectivityProvider);
 
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 600));
     final ticket = await ref.read(ticketsProvider.notifier).submit(
           reporter: user,
           title: _title.text.trim(),
@@ -176,16 +200,11 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
           _label('Attachments'),
           _AttachmentsRow(
             attachments: _attachments,
-            onAdd: () {
-              setState(() {
-                _attachments.add(Attachment(
-                  name: 'screenshot_${_attachments.length + 1}.png',
-                  size: '${300 + _attachments.length * 60} KB',
-                  icon: Icons.image_rounded,
-                ));
-              });
-            },
-            onRemove: (i) => setState(() => _attachments.removeAt(i)),
+            onAdd: _pickFile,
+            onRemove: (i) => setState(() {
+              _attachments.removeAt(i);
+              if (i < _pickedFiles.length) _pickedFiles.removeAt(i);
+            }),
           ),
         ],
       ),

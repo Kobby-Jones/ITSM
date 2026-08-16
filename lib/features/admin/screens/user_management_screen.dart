@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unnecessary_underscores
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/user.dart';
 import '../../../models/user_role.dart';
+import '../../../providers/users_admin_provider.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../theme/app_colors.dart';
@@ -20,22 +22,7 @@ class UserManagementScreen extends ConsumerStatefulWidget {
 
 class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   final _searchCtrl = TextEditingController();
-  String _query = '';
   UserRole? _roleFilter;
-
-  static const _users = [
-    _MockUser('u-001', 'Akosua Mensah', 'akosua.mensah@goldfields.gh', 'Operations', 'Plant Operator', 'Tarkwa Mine', UserRole.endUser, true),
-    _MockUser('u-002', 'Kofi Asare', 'kofi.asare@goldfields.gh', 'Plant Maintenance', 'Mechanic', 'Tarkwa Mine', UserRole.endUser, true),
-    _MockUser('u-003', 'Ama Boateng', 'ama.boateng@goldfields.gh', 'Finance', 'Senior Accountant', 'Accra HQ', UserRole.endUser, true),
-    _MockUser('u-004', 'Yaw Darko', 'yaw.darko@goldfields.gh', 'Geology', 'Senior Geologist', 'Damang Mine', UserRole.endUser, false),
-    _MockUser('u-005', 'Adwoa Frimpong', 'adwoa.frimpong@goldfields.gh', 'Human Resources', 'HR Business Partner', 'Accra HQ', UserRole.endUser, true),
-    _MockUser('t-001', 'Kwame Boateng', 'kwame.boateng@goldfields.gh', 'IT Operations', 'Senior IT Technician', 'Accra HQ', UserRole.technician, true),
-    _MockUser('t-002', 'Yaa Mensah', 'yaa.mensah@goldfields.gh', 'IT Operations', 'IT Technician', 'Accra HQ', UserRole.technician, true),
-    _MockUser('t-003', 'Kojo Owusu', 'kojo.owusu@goldfields.gh', 'IT Operations', 'IT Technician', 'Accra HQ', UserRole.technician, false),
-    _MockUser('t-004', 'Abena Asante', 'abena.asante@goldfields.gh', 'IT Operations', 'IT Technician', 'Tarkwa Mine', UserRole.technician, true),
-    _MockUser('a-001', 'Esi Owusu', 'esi.owusu@goldfields.gh', 'IT Administration', 'IT Administrator', 'Accra HQ', UserRole.admin, true),
-    _MockUser('m-001', 'Yaw Asante', 'yaw.asante@goldfields.gh', 'IT Leadership', 'IT Service Manager', 'Accra HQ', UserRole.manager, true),
-  ];
 
   @override
   void dispose() {
@@ -43,18 +30,19 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     super.dispose();
   }
 
+  void _onSearch(String query) {
+    ref.read(usersAdminProvider.notifier).load(search: query.isEmpty ? null : query);
+  }
+
   @override
   Widget build(BuildContext context) {
-    var users = _users;
-    if (_roleFilter != null) users = users.where((u) => u.role == _roleFilter).toList();
-    if (_query.isNotEmpty) {
-      final q = _query.toLowerCase();
-      users = users.where((u) =>
-          u.name.toLowerCase().contains(q) ||
-          u.email.toLowerCase().contains(q) ||
-          u.department.toLowerCase().contains(q)).toList();
-    }
+    final state = ref.watch(usersAdminProvider);
     final isDesktop = Responsive.isDesktop(context);
+
+    var users = state.users;
+    if (_roleFilter != null) {
+      users = users.where((u) => u.role == _roleFilter).toList();
+    }
 
     return Padding(
       padding: Responsive.pagePadding(context),
@@ -63,15 +51,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         children: [
           SectionHeader(
             title: 'User management',
-            subtitle: '${_users.length} users across the organization.',
-            trailing: FilledButton.icon(
-              onPressed: () => context.showSnack('Invite user coming soon.'),
-              icon: const Icon(Icons.person_add_rounded, size: 18),
-              label: const Text('Invite user'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              ),
-            ),
+            subtitle: '${state.total} users across the organization.',
           ),
           const SizedBox(height: 20),
           Row(
@@ -79,86 +59,95 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               Expanded(
                 child: TextField(
                   controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _query = v),
+                  onChanged: _onSearch,
                   decoration: const InputDecoration(
-                    hintText: 'Search by name, email, or department…',
+                    hintText: 'Search by name, email, or department...',
                     prefixIcon: Icon(Icons.search_rounded, size: 20),
+                    isDense: true,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              DropdownButtonHideUnderline(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: context.colors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: context.colors.outline),
-                  ),
-                  child: DropdownButton<UserRole?>(
-                    value: _roleFilter,
-                    hint: const Text('All roles', style: TextStyle(fontSize: 13)),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('All roles')),
-                      for (final r in UserRole.values)
-                        DropdownMenuItem(value: r, child: Text(r.label)),
-                    ],
-                    onChanged: (v) => setState(() => _roleFilter = v),
-                  ),
+              PopupMenuButton<UserRole?>(
+                tooltip: 'Filter by role',
+                icon: Badge(
+                  isLabelVisible: _roleFilter != null,
+                  child: const Icon(Icons.filter_list_rounded),
                 ),
+                onSelected: (v) => setState(() => _roleFilter = v),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: null, child: Text('All roles')),
+                  ...UserRole.values.map((r) =>
+                      PopupMenuItem(value: r, child: Text(r.label))),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: isDesktop
-                ? Container(
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.colors.outline),
+          if (state.loadState == UsersLoadState.loading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (state.loadState == UsersLoadState.error)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(state.error ?? 'Failed to load users'),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => ref.read(usersAdminProvider.notifier).refresh(),
+                      child: const Text('Retry'),
                     ),
-                    child: ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (_, i) => _UserRow(user: users[i], isLast: i == users.length - 1, desktop: true)
-                          .animate(delay: (i * 18).ms)
-                          .fadeIn(duration: 180.ms),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: users.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _UserRow(user: users[i], isLast: true),
-                  ),
-          ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => ref.read(usersAdminProvider.notifier).refresh(),
+                child: users.isEmpty
+                    ? const Center(child: Text('No users found.'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        itemCount: users.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _UserRow(
+                          user: users[i],
+                          isLast: i == users.length - 1,
+                          desktop: isDesktop,
+                          onDeactivate: () async {
+                            await ref.read(usersAdminProvider.notifier).deactivateUser(users[i].id);
+                            if (context.mounted) context.showSnack('User deactivated.');
+                          },
+                          onActivate: () async {
+                            await ref.read(usersAdminProvider.notifier).activateUser(users[i].id);
+                            if (context.mounted) context.showSnack('User activated.');
+                          },
+                        ),
+                      ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _MockUser {
-  final String id, name, email, department, position, location;
-  final UserRole role;
-  final bool active;
-  const _MockUser(this.id, this.name, this.email, this.department, this.position,
-      this.location, this.role, this.active);
-}
-
 class _UserRow extends StatelessWidget {
-  final _MockUser user;
+  final AppUser user;
   final bool isLast;
   final bool desktop;
-  const _UserRow({required this.user, required this.isLast, this.desktop = false});
+  final VoidCallback onDeactivate;
+  final VoidCallback onActivate;
 
-  String get _initials {
-    final p = user.name.split(' ');
-    if (p.length >= 2) return '${p[0][0]}${p[1][0]}'.toUpperCase();
-    return user.name.substring(0, 2).toUpperCase();
-  }
+  const _UserRow({
+    required this.user,
+    required this.isLast,
+    this.desktop = false,
+    required this.onDeactivate,
+    required this.onActivate,
+  });
 
   Color _roleColor() {
     switch (user.role) {
@@ -176,7 +165,9 @@ class _UserRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = desktop ? Colors.transparent : context.colors.surface;
-    final br = desktop ? Border(bottom: BorderSide(color: isLast ? Colors.transparent : context.colors.outline)) : Border.all(color: context.colors.outline);
+    final br = desktop
+        ? Border(bottom: BorderSide(color: isLast ? Colors.transparent : context.colors.outline))
+        : Border.all(color: context.colors.outline);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -187,7 +178,7 @@ class _UserRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          UserAvatar(initials: _initials, size: 38, showStatus: true, online: user.active),
+          UserAvatar(initials: user.initials, size: 38, showStatus: false),
           const SizedBox(width: 12),
           Expanded(
             flex: 4,
@@ -240,22 +231,25 @@ class _UserRow extends StatelessWidget {
             ),
             child: Text(
               user.role.label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: _roleColor(),
-              ),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _roleColor()),
             ),
           ),
           const SizedBox(width: 12),
           if (desktop)
-            IconButton(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded, size: 18),
-              tooltip: 'More',
-              onPressed: () => context.showSnack('User actions coming soon.'),
+              tooltip: 'Actions',
+              onSelected: (v) {
+                if (v == 'deactivate') onDeactivate();
+                if (v == 'activate') onActivate();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'activate', child: Text('Activate')),
+                const PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
+              ],
             ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 200.ms);
   }
 }

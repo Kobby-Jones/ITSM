@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../services/routing_admin_service.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../theme/app_colors.dart';
 
@@ -16,29 +17,59 @@ class RoutingRulesScreen extends ConsumerStatefulWidget {
 }
 
 class _RoutingRulesScreenState extends ConsumerState<RoutingRulesScreen> {
-  final _rules = <_Rule>[
-    const _Rule('Network → Network specialists',
-        'Category = Network → Assign to Kwame Boateng or Yaa Mensah (least workload)',
-        true, 0),
-    const _Rule('Production → Production specialists',
-        'Category = Production OR location = Tarkwa Mine → Assign to Kwame Boateng',
-        true, 1),
-    const _Rule('P1 escalation',
-        'Priority = P1 AND unassigned for > 5m → Notify on-call manager',
-        true, 2),
-    const _Rule('Account access → Admin team',
-        'Category = Account Access & Identity → Assign to Abena Asante',
-        true, 3),
-    const _Rule('Hardware → Field tech by location',
-        'Category = Hardware → Assign to nearest field tech (Tarkwa: Nana Adjei, Damang: Akua Pokuaa)',
-        true, 4),
-    const _Rule('Printer issues → Office tech',
-        'Category = Printing → Assign to Yaa Mensah',
-        false, 5),
-    const _Rule('After-hours fallback',
-        'Time outside 06:00-22:00 → Route to on-call duty technician',
-        true, 6),
-  ];
+  List<RoutingRule> _rules = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRules();
+  }
+
+  Future<void> _fetchRules() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      _rules = await RoutingAdminService.instance.getRules();
+      _rules.sort((a, b) => a.priority.compareTo(b.priority));
+    } catch (e) {
+      _error = e.toString();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _toggleRule(RoutingRule rule) async {
+    try {
+      await RoutingAdminService.instance.updateRule(rule.id, {
+        'isActive': !rule.isActive,
+      });
+      await _fetchRules();
+    } catch (e) {
+      if (mounted) context.showSnack('Failed: $e', error: true);
+    }
+  }
+
+  Future<void> _deleteRule(RoutingRule rule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete rule'),
+        content: Text('Delete "${rule.name}"? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await RoutingAdminService.instance.deleteRule(rule.id);
+      await _fetchRules();
+      if (mounted) context.showSnack('Rule deleted.');
+    } catch (e) {
+      if (mounted) context.showSnack('Failed: $e', error: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,25 +83,39 @@ class _RoutingRulesScreenState extends ConsumerState<RoutingRulesScreen> {
             children: [
               SectionHeader(
                 title: 'Routing rules',
-                subtitle: 'Auto-assignment rules — evaluated top to bottom.',
-                trailing: FilledButton.icon(
-                  onPressed: () => context.showSnack('Rule builder coming soon.'),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('New rule'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  ),
-                ),
+                subtitle: '${_rules.length} rules — evaluated top to bottom.',
               ),
               const SizedBox(height: 24),
-              for (var i = 0; i < _rules.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _RuleCard(
-                    rule: _rules[i],
-                    onToggle: (v) => setState(() => _rules[i] = _rules[i].copyWith(enabled: v)),
+              if (_loading)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ))
+              else if (_error != null)
+                Center(child: Column(
+                  children: [
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 12),
+                    FilledButton(onPressed: _fetchRules, child: const Text('Retry')),
+                  ],
+                ))
+              else ...[
+                for (var i = 0; i < _rules.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _RuleCard(
+                      rule: _rules[i],
+                      index: i,
+                      onToggle: (_) => _toggleRule(_rules[i]),
+                      onDelete: () => _deleteRule(_rules[i]),
+                    ),
                   ),
-                ),
+                if (_rules.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('No routing rules configured.')),
+                  ),
+              ],
               const SizedBox(height: 24),
             ],
           ),
@@ -80,19 +125,12 @@ class _RoutingRulesScreenState extends ConsumerState<RoutingRulesScreen> {
   }
 }
 
-class _Rule {
-  final String name;
-  final String description;
-  final bool enabled;
-  final int order;
-  const _Rule(this.name, this.description, this.enabled, this.order);
-  _Rule copyWith({bool? enabled}) => _Rule(name, description, enabled ?? this.enabled, order);
-}
-
 class _RuleCard extends StatelessWidget {
-  final _Rule rule;
+  final RoutingRule rule;
+  final int index;
   final ValueChanged<bool> onToggle;
-  const _RuleCard({required this.rule, required this.onToggle});
+  final VoidCallback onDelete;
+  const _RuleCard({required this.rule, required this.index, required this.onToggle, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -110,17 +148,17 @@ class _RuleCard extends StatelessWidget {
             height: 36,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: rule.enabled
+              color: rule.isActive
                   ? AppColors.primary.withOpacity(0.10)
                   : context.colors.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '${rule.order + 1}',
+              '${index + 1}',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
-                color: rule.enabled
+                color: rule.isActive
                     ? AppColors.primary
                     : context.colors.onSurface.withOpacity(0.5),
               ),
@@ -134,29 +172,42 @@ class _RuleCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(rule.name,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    Flexible(
+                      child: Text(rule.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: (rule.enabled ? AppColors.success : Colors.grey)
-                            .withOpacity(0.12),
+                        color: (rule.isActive ? AppColors.success : Colors.grey).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        rule.enabled ? 'Enabled' : 'Disabled',
+                        rule.isActive ? 'Enabled' : 'Disabled',
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: rule.enabled ? AppColors.success : Colors.grey,
+                          color: rule.isActive ? AppColors.success : Colors.grey,
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        rule.ruleType.replaceAll('_', ' '),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.info),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(rule.description,
+                Text(rule.description ?? '',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: context.colors.onSurface.withOpacity(0.65),
@@ -165,19 +216,11 @@ class _RuleCard extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
-            value: rule.enabled,
-            onChanged: onToggle,
-          ),
+          Switch(value: rule.isActive, onChanged: onToggle),
           IconButton(
-            icon: const Icon(Icons.drag_indicator_rounded),
-            tooltip: 'Reorder',
-            onPressed: () => context.showSnack('Reorder coming soon.'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_rounded, size: 18),
-            tooltip: 'Edit',
-            onPressed: () => context.showSnack('Rule editor coming soon.'),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            tooltip: 'Delete',
+            onPressed: onDelete,
           ),
         ],
       ),

@@ -58,7 +58,21 @@ class ApiEndpoints {
 
   // Analytics
   static const analyticsDashboard = '/analytics/dashboard';
+  static const analyticsTrends = '/analytics/trends';
   static const analyticsTechnicianPerformance = '/analytics/technician-performance';
+  static const analyticsResolutionTime = '/analytics/resolution-time';
+  static const analyticsCategoryBreakdown = '/analytics/category-breakdown';
+
+  // SLA
+  static const slaConfigurations = '/sla/configurations';
+  static String slaConfiguration(String priority) => '/sla/configurations/$priority';
+  static String slaTicketStatus(String ticketId) => '/sla/tickets/$ticketId/status';
+  static const slaReport = '/sla/report';
+
+  // Routing rules
+  static const routing = '/routing';
+  static String routingRule(String id) => '/routing/$id';
+  static String routingRuleTest(String id) => '/routing/$id/test';
 
   // Telemetry
   static const telemetry = '/telemetry';

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/ticket.dart';
+import '../../../services/sla_admin_service.dart';
 import '../../../shared/widgets/section_header.dart';
 
 class SlaConfigScreen extends ConsumerStatefulWidget {
@@ -24,17 +25,78 @@ class _SlaConfigScreenState extends ConsumerState<SlaConfigScreen> {
   };
 
   final _resolution = <TicketPriority, int>{
-    TicketPriority.p1: 4, // hours
-    TicketPriority.p2: 8,
-    TicketPriority.p3: 24,
-    TicketPriority.p4: 72,
+    TicketPriority.p1: 240, // minutes
+    TicketPriority.p2: 480,
+    TicketPriority.p3: 1440,
+    TicketPriority.p4: 4320,
   };
 
   bool _businessHoursOnly = false;
   bool _autoEscalate = true;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConfig();
+  }
+
+  Future<void> _fetchConfig() async {
+    setState(() => _loading = true);
+    try {
+      final configs = await SlaAdminService.instance.getConfigurations();
+      for (final c in configs) {
+        final p = _priorityFromApi(c.priority);
+        if (p != null) {
+          _firstResponse[p] = c.responseTimeMinutes;
+          _resolution[p] = c.resolutionTimeMinutes;
+        }
+      }
+    } catch (_) {
+      // Keep defaults if fetch fails.
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  TicketPriority? _priorityFromApi(String s) => switch (s) {
+        'P1_CRITICAL' => TicketPriority.p1,
+        'P2_HIGH' => TicketPriority.p2,
+        'P3_MEDIUM' => TicketPriority.p3,
+        'P4_LOW' => TicketPriority.p4,
+        _ => null,
+      };
+
+  String _priorityToApi(TicketPriority p) => switch (p) {
+        TicketPriority.p1 => 'P1_CRITICAL',
+        TicketPriority.p2 => 'P2_HIGH',
+        TicketPriority.p3 => 'P3_MEDIUM',
+        TicketPriority.p4 => 'P4_LOW',
+      };
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      for (final p in TicketPriority.values) {
+        await SlaAdminService.instance.updateConfiguration(
+          priority: _priorityToApi(p),
+          responseTimeMinutes: _firstResponse[p]!,
+          resolutionTimeMinutes: _resolution[p]!,
+        );
+      }
+      if (mounted) context.showSnack('SLA targets saved.');
+    } catch (e) {
+      if (mounted) context.showSnack('Failed to save: $e', error: true);
+    }
+    if (mounted) setState(() => _saving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: Responsive.pagePadding(context),
       child: Center(
@@ -47,9 +109,11 @@ class _SlaConfigScreenState extends ConsumerState<SlaConfigScreen> {
                 title: 'SLA configuration',
                 subtitle: 'Set first-response and resolution targets per priority.',
                 trailing: FilledButton.icon(
-                  onPressed: () => context.showSnack('SLA targets saved.'),
-                  icon: const Icon(Icons.save_rounded, size: 18),
-                  label: const Text('Save changes'),
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: Text(_saving ? 'Saving...' : 'Save changes'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   ),
