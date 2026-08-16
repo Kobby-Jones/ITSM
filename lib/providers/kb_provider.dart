@@ -19,6 +19,21 @@ class KbController extends StateNotifier<List<KbArticle>> {
 
   Future<void> refresh() => load();
 
+  /// Fetch a single article from the server by its id and merge it into
+  /// the in-memory list so the detail screen gets full content.
+  Future<KbArticle> fetchById(String id) async {
+    final article = await KbService.instance.getArticleById(id);
+    final exists = state.any((a) => a.id == id);
+    if (exists) {
+      state = [
+        for (final a in state) a.id == id ? article : a,
+      ];
+    } else {
+      state = [article, ...state];
+    }
+    return article;
+  }
+
   Future<void> rate(String articleId, {required bool helpful}) async {
     try {
       await KbService.instance.rate(articleId, helpful: helpful);

@@ -82,12 +82,17 @@ class TicketsController extends StateNotifier<List<Ticket>> {
 
   TicketsLoadState loadState = TicketsLoadState.loading;
   String? loadError;
+  int _currentPage = 1;
+  int _totalServerCount = 0;
+  bool get hasMore => state.length < _totalServerCount;
 
   Future<void> load() async {
+    _currentPage = 1;
     loadState = TicketsLoadState.loading;
     try {
-      final tickets = await TicketsService.instance.getTickets();
-      state = tickets;
+      final result = await TicketsService.instance.getTicketsPaginated(page: 1);
+      state = result.tickets;
+      _totalServerCount = result.total;
       loadState = TicketsLoadState.loaded;
     } catch (e) {
       loadError = e.toString();
@@ -95,6 +100,21 @@ class TicketsController extends StateNotifier<List<Ticket>> {
     }
     // Trigger a rebuild of anything watching ticketsLoadStateProvider.
     _ref.invalidate(ticketsLoadStateProvider);
+  }
+
+  Future<void> loadMore() async {
+    if (!hasMore) return;
+    _currentPage++;
+    try {
+      final result = await TicketsService.instance.getTicketsPaginated(page: _currentPage);
+      // Append, avoiding duplicates by id.
+      final existingIds = state.map((t) => t.id).toSet();
+      final newOnes = result.tickets.where((t) => !existingIds.contains(t.id));
+      state = [...state, ...newOnes];
+      _totalServerCount = result.total;
+    } catch (_) {
+      _currentPage--; // roll back so the next attempt retries this page
+    }
   }
 
   Future<void> refresh() => load();

@@ -10,7 +10,9 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/user_role.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/dashboard_provider.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/dashboard_service.dart';
 import '../../../theme/app_colors.dart';
 
 class HomeDashboardScreen extends ConsumerWidget {
@@ -135,16 +137,25 @@ class _Greeting extends StatelessWidget {
   }
 }
 
-class _KpiGrid extends StatelessWidget {
+class _KpiGrid extends ConsumerWidget {
   final UserRole role;
   const _KpiGrid({required this.role});
 
   @override
-  Widget build(BuildContext context) {
-    final kpis = _kpisFor(role);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashState = ref.watch(dashboardProvider);
     final isDesktop = Responsive.isDesktop(context);
     final isTablet = Responsive.isTablet(context);
     final cross = isDesktop ? 4 : (isTablet ? 2 : 2);
+
+    if (dashState.loadState == DashboardLoadState.loading) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(32),
+        child: CircularProgressIndicator(),
+      ));
+    }
+
+    final kpis = _kpisFor(role, dashState.kpis);
 
     return GridView.count(
       shrinkWrap: true,
@@ -159,51 +170,62 @@ class _KpiGrid extends StatelessWidget {
     );
   }
 
-  List<_KpiData> _kpisFor(UserRole role) {
+  String _fmtGrowth(double? g) {
+    if (g == null) return '';
+    final sign = g >= 0 ? '+' : '';
+    return '$sign${g.toStringAsFixed(1)}% MoM';
+  }
+
+  String _fmtHours(double? h) {
+    if (h == null) return 'N/A';
+    return '${h.toStringAsFixed(1)}h';
+  }
+
+  List<_KpiData> _kpisFor(UserRole role, DashboardKpis k) {
     switch (role) {
       case UserRole.endUser:
-        return const [
-          _KpiData('Open tickets', '3', Icons.confirmation_number_rounded,
-              AppColors.statusOpen, '+1 today'),
-          _KpiData('Awaiting response', '1', Icons.hourglass_top_rounded,
-              AppColors.warning, 'Updated 2h ago'),
-          _KpiData('Resolved this month', '14', Icons.check_circle_rounded,
-              AppColors.success, '+3 vs last'),
-          _KpiData('KB articles read', '27', Icons.menu_book_rounded,
-              AppColors.info, '+5 this week'),
+        return [
+          _KpiData('Open tickets', '${k.openTickets}', Icons.confirmation_number_rounded,
+              AppColors.statusOpen, '${k.thisMonthTickets} this month'),
+          _KpiData('Total tickets', '${k.totalTickets}', Icons.hourglass_top_rounded,
+              AppColors.warning, ''),
+          _KpiData('Resolved', '${k.resolvedTickets}', Icons.check_circle_rounded,
+              AppColors.success, _fmtGrowth(k.monthGrowth)),
+          _KpiData('SLA compliance', '${k.slaComplianceRate.toStringAsFixed(0)}%', Icons.verified_rounded,
+              AppColors.info, '${k.slaBreached} breached'),
         ];
       case UserRole.technician:
-        return const [
-          _KpiData('Assigned to me', '12', Icons.assignment_ind_rounded,
-              AppColors.statusInProgress, '4 due today'),
-          _KpiData('SLA at risk', '3', Icons.timer_rounded, AppColors.warning,
-              'Within 1h'),
-          _KpiData('Resolved today', '7', Icons.check_circle_rounded,
-              AppColors.success, '+2 vs yesterday'),
-          _KpiData('Avg. resolution', '4.2h', Icons.speed_rounded,
-              AppColors.primary, '-0.5h vs last'),
+        return [
+          _KpiData('Open tickets', '${k.openTickets}', Icons.assignment_ind_rounded,
+              AppColors.statusInProgress, '${k.criticalOpen} critical/high'),
+          _KpiData('SLA breached', '${k.slaBreached}', Icons.timer_rounded, AppColors.warning,
+              '${k.slaComplianceRate.toStringAsFixed(0)}% compliant'),
+          _KpiData('Resolved', '${k.resolvedTickets}', Icons.check_circle_rounded,
+              AppColors.success, _fmtGrowth(k.monthGrowth)),
+          _KpiData('Avg. resolution', _fmtHours(k.avgResolutionHours), Icons.speed_rounded,
+              AppColors.primary, ''),
         ];
       case UserRole.admin:
-        return const [
-          _KpiData('Total assets', '1,284', Icons.inventory_2_rounded,
-              AppColors.primary, '+18 this month'),
-          _KpiData('Active users', '342', Icons.group_rounded, AppColors.info,
-              '12 new'),
-          _KpiData('KB articles', '128', Icons.menu_book_rounded,
-              AppColors.success, '+6 this week'),
-          _KpiData('Routing rules', '24', Icons.route_rounded,
-              AppColors.statusInProgress, '2 disabled'),
+        return [
+          _KpiData('Active assets', '${k.activeAssets ?? 0}', Icons.inventory_2_rounded,
+              AppColors.primary, ''),
+          _KpiData('Active users', '${k.totalUsers ?? 0}', Icons.group_rounded, AppColors.info,
+              ''),
+          _KpiData('Total tickets', '${k.totalTickets}', Icons.confirmation_number_rounded,
+              AppColors.success, '${k.thisMonthTickets} this month'),
+          _KpiData('SLA compliance', '${k.slaComplianceRate.toStringAsFixed(0)}%', Icons.verified_rounded,
+              AppColors.statusInProgress, '${k.slaBreached} breached'),
         ];
       case UserRole.manager:
-        return const [
-          _KpiData('Tickets this week', '247', Icons.confirmation_number_rounded,
-              AppColors.primary, '+12% WoW'),
-          _KpiData('SLA compliance', '94%', Icons.verified_rounded,
-              AppColors.success, '+2.4 pts'),
-          _KpiData('Avg. resolution', '3.8h', Icons.speed_rounded, AppColors.info,
-              '-0.6h MoM'),
-          _KpiData('CSAT', '4.6 / 5', Icons.sentiment_satisfied_rounded,
-              AppColors.warning, '+0.1'),
+        return [
+          _KpiData('Tickets this month', '${k.thisMonthTickets}', Icons.confirmation_number_rounded,
+              AppColors.primary, _fmtGrowth(k.monthGrowth)),
+          _KpiData('SLA compliance', '${k.slaComplianceRate.toStringAsFixed(0)}%', Icons.verified_rounded,
+              AppColors.success, '${k.slaBreached} breached'),
+          _KpiData('Avg. resolution', _fmtHours(k.avgResolutionHours), Icons.speed_rounded, AppColors.info,
+              ''),
+          _KpiData('Escalated', '${k.escalatedTickets}', Icons.arrow_upward_rounded,
+              AppColors.warning, '${k.criticalOpen} critical/high open'),
         ];
     }
   }

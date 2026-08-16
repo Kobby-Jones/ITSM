@@ -13,19 +13,46 @@ import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/section_header.dart';
 
-class AssetDetailScreen extends ConsumerWidget {
+class AssetDetailScreen extends ConsumerStatefulWidget {
   final String assetId;
   const AssetDetailScreen({super.key, required this.assetId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AssetDetailScreen> createState() => _AssetDetailScreenState();
+}
+
+class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
+  bool _loading = true;
+  String? _fetchError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAsset();
+  }
+
+  Future<void> _fetchAsset() async {
+    setState(() { _loading = true; _fetchError = null; });
+    try {
+      await ref.read(assetsControllerProvider.notifier).fetchById(widget.assetId);
+    } catch (e) {
+      _fetchError = e.toString();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final all = ref.watch(assetsProvider);
-    final asset = assetByIdFrom(all, assetId);
+    final asset = assetByIdFrom(all, widget.assetId);
     if (asset == null) {
       return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'Asset not found',
-        message: 'We couldn\'t find asset "$assetId".',
+        title: _fetchError != null ? 'Failed to load asset' : 'Asset not found',
+        message: _fetchError ?? 'We couldn\'t find asset "${widget.assetId}".',
         actionLabel: 'Back to assets',
         onAction: () => context.go(AppRoutes.assets),
       );

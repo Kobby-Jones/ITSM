@@ -24,6 +24,22 @@ class AssetsController extends StateNotifier<List<Asset>> {
   }
 
   Future<void> refresh() => load();
+
+  /// Fetch a single asset from the server by its id and merge it into
+  /// the in-memory list so the detail screen gets full data.
+  Future<Asset> fetchById(String id) async {
+    final asset = await AssetsService.instance.getAssetById(id);
+    final exists = state.any((a) => a.id == id || a.tag == id);
+    if (exists) {
+      state = [
+        for (final a in state)
+          (a.id == id || a.tag == id) ? asset : a,
+      ];
+    } else {
+      state = [asset, ...state];
+    }
+    return asset;
+  }
 }
 
 final assetsControllerProvider =

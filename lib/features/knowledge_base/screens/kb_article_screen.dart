@@ -24,9 +24,37 @@ class KbArticleScreen extends ConsumerStatefulWidget {
 
 class _KbArticleScreenState extends ConsumerState<KbArticleScreen> {
   bool? _voted; // null = not voted, true = helpful, false = not helpful
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchArticle();
+  }
+
+  Future<void> _fetchArticle() async {
+    setState(() { _loading = true; });
+    try {
+      await ref.read(kbControllerProvider.notifier).fetchById(widget.articleId);
+    // ignore: empty_catches
+    } catch (e) {
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _onRate(bool helpful) async {
+    setState(() => _voted = helpful);
+    await ref.read(kbControllerProvider.notifier).rate(
+      widget.articleId,
+      helpful: helpful,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final all = ref.watch(kbArticlesProvider);
     final article = kbArticleByIdFrom(all, widget.articleId);
     if (article == null) {
@@ -125,7 +153,7 @@ class _KbArticleScreenState extends ConsumerState<KbArticleScreen> {
                 article: article,
                 voted: _voted,
                 onVote: (v) {
-                  setState(() => _voted = v);
+                  _onRate(v);
                   context.showSnack(v ? 'Marked helpful — thanks!' : 'Thanks for the feedback.');
                 },
               ),

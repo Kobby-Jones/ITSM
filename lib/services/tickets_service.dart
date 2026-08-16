@@ -23,22 +23,44 @@ class TicketsService {
   /// Fetches all tickets visible to the current user (own tickets for end
   /// users, all tickets for staff — enforced server-side by permission).
   /// Falls back to the last cached page if offline.
-  Future<List<Ticket>> getTickets({Map<String, dynamic>? filters}) async {
+  /// Fetches tickets with pagination support. Returns both the list and
+  /// the total server count so the UI can implement infinite scroll or
+  /// page controls.
+  Future<({List<Ticket> tickets, int total})> getTicketsPaginated({
+    int page = 1,
+    int limit = 50,
+    Map<String, dynamic>? filters,
+  }) async {
     try {
       final res = await _dio.get(ApiEndpoints.tickets, queryParameters: {
-        'limit': 100,
+        'page': page,
+        'limit': limit,
         ...?filters,
       });
       final data = res.data['data'] as List;
-      await LocalCacheService.instance.putJsonWithTimestamp(_cacheKey, data);
-      return data.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList();
+      final total = res.data['total'] as int? ?? data.length;
+      if (page == 1) {
+        await LocalCacheService.instance.putJsonWithTimestamp(_cacheKey, data);
+      }
+      return (
+        tickets: data.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList(),
+        total: total,
+      );
     } catch (e) {
-      final cached = LocalCacheService.instance.getJson(_cacheKey) as List?;
-      if (cached != null) {
-        return cached.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList();
+      if (page == 1) {
+        final cached = LocalCacheService.instance.getJson(_cacheKey) as List?;
+        if (cached != null) {
+          final list = cached.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList();
+          return (tickets: list, total: list.length);
+        }
       }
       throw ApiClient.instance.mapError(e);
     }
+  }
+
+  Future<List<Ticket>> getTickets({Map<String, dynamic>? filters}) async {
+    final result = await getTicketsPaginated(page: 1, limit: 100, filters: filters);
+    return result.tickets;
   }
 
   Future<Ticket> getTicketById(String id) async {
