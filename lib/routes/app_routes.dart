@@ -1,12 +1,12 @@
 class AppRoutes {
   // Auth
-  static const splash = '/';
+  static const splash = '/splash';
   static const login = '/login';
   static const register = '/register';
   static const forgotPassword = '/forgot-password';
 
   // Shell
-  static const home = '/home';                      // role-aware dashboard
+  static const home = '/';                           // role-aware dashboard
   static const tickets = '/tickets';
   static const ticketDetail = '/tickets/:id';       // /tickets/T-1029
   static const submitTicket = '/tickets/new';

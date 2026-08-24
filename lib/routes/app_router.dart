@@ -52,10 +52,11 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
+    debugLogDiagnostics: true,
     refreshListenable: listenable,
     redirect: (context, state) {
       final auth = ref.read(authProvider);
-      final loc = state.matchedLocation;
+      final loc = state.uri.path;
 
       const authRoutes = {AppRoutes.login, AppRoutes.register, AppRoutes.forgotPassword};
       final isAuthRoute = authRoutes.contains(loc);
@@ -120,147 +121,218 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ForgotPasswordScreen(),
       ),
 
-      // Authenticated shell
-      ShellRoute(
-        builder: (context, state, child) =>
-            AdaptiveShell(currentLocation: state.matchedLocation, child: child),
-        routes: [
-          GoRoute(path: AppRoutes.home, builder: (_, __) => const HomeDashboardScreen()),
+      // Authenticated shell — using StatefulShellRoute for reliable
+      // path matching in GoRouter 17.x release builds.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AdaptiveShell(
+              currentLocation: state.matchedLocation,
+              child: navigationShell,
+            ),
+        branches: [
+          StatefulShellBranch(
+            // Use the root / as the dashboard path so it's the default
+            // landing after login. This avoids the release-mode issue
+            // where /home inside a shell branch isn't found as a
+            // top-level route during redirect resolution.
+            routes: [
+              GoRoute(path: '/', builder: (_, __) => const HomeDashboardScreen()),
+            ],
+          ),
 
           // Tickets
-          GoRoute(
-            path: AppRoutes.tickets,
-            builder: (_, __) => const TicketsListScreen(),
-            routes: [
-              GoRoute(
-                path: 'new',
-                builder: (_, __) => const SubmitTicketScreen(),
-              ),
-              GoRoute(
-                path: ':id',
-                builder: (_, state) =>
-                    TicketDetailScreen(ticketId: state.pathParameters['id']!),
-                routes: [
-                  GoRoute(
-                    path: 'resolve',
-                    builder: (_, state) => TicketResolutionScreen(
-                      ticketId: state.pathParameters['id']!,
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.tickets,
+              builder: (_, __) => const TicketsListScreen(),
+              routes: [
+                GoRoute(
+                  path: 'new',
+                  builder: (_, __) => const SubmitTicketScreen(),
+                ),
+                GoRoute(
+                  path: ':id',
+                  builder: (_, state) =>
+                      TicketDetailScreen(ticketId: state.pathParameters['id']!),
+                  routes: [
+                    GoRoute(
+                      path: 'resolve',
+                      builder: (_, state) => TicketResolutionScreen(
+                        ticketId: state.pathParameters['id']!,
+                      ),
                     ),
-                  ),
-                  GoRoute(
-                    path: 'telemetry',
-                    builder: (_, state) => TelemetryAnalysisScreen(
-                      ticketId: state.pathParameters['id']!,
+                    GoRoute(
+                      path: 'telemetry',
+                      builder: (_, state) => TelemetryAnalysisScreen(
+                        ticketId: state.pathParameters['id']!,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
+          ]),
 
           // Knowledge Base
-          GoRoute(
-            path: AppRoutes.knowledgeBase,
-            builder: (_, __) => const KbBrowseScreen(),
-            routes: [
-              GoRoute(
-                path: ':id',
-                builder: (_, state) =>
-                    KbArticleScreen(articleId: state.pathParameters['id']!),
-              ),
-            ],
-          ),
-
-          // Notifications, Settings, Profile, Search, Sync, Offline
-          GoRoute(
-            path: AppRoutes.notifications,
-            builder: (_, __) => const NotificationsScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.settings,
-            builder: (_, __) => const SettingsScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.profile,
-            builder: (_, __) => const ProfileScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.search,
-            builder: (_, __) => const SearchScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.syncQueue,
-            builder: (_, __) => const SyncQueueScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.offline,
-            builder: (_, __) => const PlaceholderScreen(
-              title: 'Offline mode',
-              description: 'You are offline. Tickets created here will sync when reconnected.',
-              icon: Icons.cloud_off_rounded,
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.knowledgeBase,
+              builder: (_, __) => const KbBrowseScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (_, state) =>
+                      KbArticleScreen(articleId: state.pathParameters['id']!),
+                ),
+              ],
             ),
-          ),
+          ]),
+
+          // Notifications
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.notifications,
+              builder: (_, __) => const NotificationsScreen(),
+            ),
+          ]),
+
+          // Settings
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.settings,
+              builder: (_, __) => const SettingsScreen(),
+            ),
+          ]),
+
+          // Profile
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.profile,
+              builder: (_, __) => const ProfileScreen(),
+            ),
+          ]),
+
+          // Search
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.search,
+              builder: (_, __) => const SearchScreen(),
+            ),
+          ]),
+
+          // Sync Queue
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.syncQueue,
+              builder: (_, __) => const SyncQueueScreen(),
+            ),
+          ]),
+
+          // Offline
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.offline,
+              builder: (_, __) => const PlaceholderScreen(
+                title: 'Offline mode',
+                description: 'You are offline. Tickets created here will sync when reconnected.',
+                icon: Icons.cloud_off_rounded,
+              ),
+            ),
+          ]),
 
           // Technician
-          GoRoute(
-            path: AppRoutes.ticketQueue,
-            builder: (_, __) => const TicketsListScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.slaMonitor,
-            builder: (_, __) => const SlaMonitorScreen(),
-          ),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.ticketQueue,
+              builder: (_, __) => const TicketsListScreen(),
+            ),
+          ]),
 
-          // Admin
-          GoRoute(
-            path: AppRoutes.assets,
-            builder: (_, __) => const AssetsListScreen(),
-            routes: [
-              GoRoute(
-                path: ':id',
-                builder: (_, state) =>
-                    AssetDetailScreen(assetId: state.pathParameters['id']!),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: AppRoutes.userManagement,
-            builder: (_, __) => const UserManagementScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.kbManagement,
-            builder: (_, __) => const KbManagementScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.routingRules,
-            builder: (_, __) => const RoutingRulesScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.slaConfig,
-            builder: (_, __) => const SlaConfigScreen(),
-          ),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.slaMonitor,
+              builder: (_, __) => const SlaMonitorScreen(),
+            ),
+          ]),
+
+          // Admin — Assets
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.assets,
+              builder: (_, __) => const AssetsListScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (_, state) =>
+                      AssetDetailScreen(assetId: state.pathParameters['id']!),
+                ),
+              ],
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.userManagement,
+              builder: (_, __) => const UserManagementScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.kbManagement,
+              builder: (_, __) => const KbManagementScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.routingRules,
+              builder: (_, __) => const RoutingRulesScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.slaConfig,
+              builder: (_, __) => const SlaConfigScreen(),
+            ),
+          ]),
 
           // Manager
-          GoRoute(
-            path: AppRoutes.analytics,
-            builder: (_, __) => const AnalyticsDashboardScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.kpiDashboard,
-            builder: (_, __) => const KpiDashboardScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.technicianPerformance,
-            builder: (_, __) => const TechnicianPerformanceScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.slaCompliance,
-            builder: (_, __) => const SlaComplianceScreen(),
-          ),
-          GoRoute(
-            path: AppRoutes.reports,
-            builder: (_, __) => const ReportsScreen(),
-          ),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.analytics,
+              builder: (_, __) => const AnalyticsDashboardScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.kpiDashboard,
+              builder: (_, __) => const KpiDashboardScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.technicianPerformance,
+              builder: (_, __) => const TechnicianPerformanceScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.slaCompliance,
+              builder: (_, __) => const SlaComplianceScreen(),
+            ),
+          ]),
+
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.reports,
+              builder: (_, __) => const ReportsScreen(),
+            ),
+          ]),
         ],
       ),
     ],
@@ -277,7 +349,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => context.go(AppRoutes.home),
+              onPressed: () => context.go(AppRoutes.splash),
               child: const Text('Go home'),
             ),
           ],

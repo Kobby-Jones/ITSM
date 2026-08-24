@@ -66,7 +66,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   .scale(begin: const Offset(0.6, 0.6), curve: Curves.elasticOut, duration: 700.ms),
               const SizedBox(height: 28),
               const Text(
-                'ITSM Framework',
+                'FlowDesk',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,

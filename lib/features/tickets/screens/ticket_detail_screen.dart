@@ -17,7 +17,6 @@ import '../../../routes/app_routes.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../theme/app_colors.dart';
-import '../mock_ticket_data.dart';
 import '../widgets/priority_badge.dart';
 import '../widgets/sla_countdown.dart';
 import '../widgets/sync_state_chip.dart';
@@ -895,9 +894,6 @@ class _TelemetryPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // NOTE: still mock data — see telemetry_analysis_screen.dart for why
-    // (backend telemetry is per-device, not per-ticket).
-    final tel = MockTelemetryData.forTicket(ticket.id);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -916,94 +912,21 @@ class _TelemetryPreviewCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            tel.deviceModel,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-          ),
-          Text(
-            tel.hostname,
-            style: TextStyle(
-                fontSize: 11.5, color: context.colors.onSurface.withOpacity(0.6)),
-          ),
-          const SizedBox(height: 12),
-          _MetricBar(label: 'CPU', value: tel.cpuUsage, valueLabel: '${(tel.cpuUsage * 100).toStringAsFixed(0)}%'),
-          const SizedBox(height: 8),
-          _MetricBar(
-            label: 'RAM',
-            value: tel.ramUsage,
-            valueLabel:
-                '${(tel.ramUsedMb / 1024).toStringAsFixed(1)} / ${(tel.ramTotalMb / 1024).toStringAsFixed(0)} GB',
-          ),
-          const SizedBox(height: 8),
-          _MetricBar(
-            label: 'Disk',
-            value: tel.storageUsage,
-            valueLabel: '${tel.storageUsedGb} / ${tel.storageTotalGb} GB',
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.network_check_rounded,
-                  size: 14, color: context.colors.onSurface.withOpacity(0.55)),
-              const SizedBox(width: 6),
-              Text(
-                '${tel.networkType} · ${tel.networkStatus}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No telemetry snapshot was collected when this ticket was created.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: context.colors.onSurface.withOpacity(0.5),
+                ),
+                textAlign: TextAlign.center,
               ),
-            ],
+            ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _MetricBar extends StatelessWidget {
-  final String label;
-  final double value;
-  final String valueLabel;
-  const _MetricBar({required this.label, required this.value, required this.valueLabel});
-
-  Color _color(double v) {
-    if (v > 0.85) return AppColors.danger;
-    if (v > 0.7) return AppColors.warning;
-    return AppColors.success;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _color(value);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: context.colors.onSurface.withOpacity(0.65),
-                )),
-            const Spacer(),
-            Text(valueLabel,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                )),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: value.clamp(0.0, 1.0),
-            minHeight: 6,
-            backgroundColor: context.colors.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -50,11 +50,12 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   device_info_plus: ^10.1.0
   battery_plus: ^6.0.3
-  file_picker: ^6.2.1
+  file_picker: ^8.3.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  msix: ^3.16.7
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

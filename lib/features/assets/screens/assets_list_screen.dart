@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,6 +11,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../models/asset.dart';
 import '../../../providers/assets_provider.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/assets_service.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/section_header.dart';
 
@@ -31,6 +32,76 @@ class _AssetsListScreenState extends ConsumerState<AssetsListScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _showRegisterDialog(BuildContext context) async {
+    final nameCtrl = TextEditingController();
+    final serialCtrl = TextEditingController();
+    final tagCtrl = TextEditingController();
+    AssetCategory selectedCategory = AssetCategory.values.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Register asset'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Asset name'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: serialCtrl,
+                  decoration: const InputDecoration(labelText: 'Serial number'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tagCtrl,
+                  decoration: const InputDecoration(labelText: 'Asset tag'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<AssetCategory>(
+                  value: selectedCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: AssetCategory.values
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
+                      .toList(),
+                  onChanged: (v) => setDialogState(() => selectedCategory = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Register')),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    if (nameCtrl.text.trim().isEmpty) {
+      context.showSnack('Asset name is required.', error: true);
+      return;
+    }
+
+    try {
+      await AssetsService.instance.createAsset({
+        'name': nameCtrl.text.trim(),
+        'serialNumber': serialCtrl.text.trim(),
+        'assetTag': tagCtrl.text.trim(),
+        'category': selectedCategory.name.toUpperCase(),
+        'status': 'ACTIVE',
+      });
+      await ref.read(assetsControllerProvider.notifier).refresh();
+      if (mounted) context.showSnack('Asset registered.');
+    } catch (e) {
+      if (mounted) context.showSnack('Failed: $e', error: true);
+    }
   }
 
   @override
@@ -59,7 +130,7 @@ class _AssetsListScreenState extends ConsumerState<AssetsListScreen> {
             title: 'Asset management',
             subtitle: 'Hardware and software registry — ${all.length} assets.',
             trailing: FilledButton.icon(
-              onPressed: () => context.showSnack('Asset registration coming soon.'),
+              onPressed: () => _showRegisterDialog(context),
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Register asset'),
               style: FilledButton.styleFrom(
@@ -68,9 +139,13 @@ class _AssetsListScreenState extends ConsumerState<AssetsListScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
+              SizedBox(
+                width: isDesktop ? 300 : double.infinity,
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (v) => setState(() => _query = v),

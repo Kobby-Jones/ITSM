@@ -121,10 +121,10 @@ class Asset {
       location: json['location'] as String? ?? '',
       purchasedOn: json['purchaseDate'] != null
           ? DateTime.parse(json['purchaseDate'] as String)
-          : DateTime.now(),
+          : DateTime(1970),
       warrantyUntil: json['warrantyExpiry'] != null
           ? DateTime.parse(json['warrantyExpiry'] as String)
-          : DateTime.now(),
+          : DateTime(1970),
       cost: double.tryParse(json['purchasePrice']?.toString() ?? '') ?? 0,
       assignmentHistory: assignments
           .cast<Map<String, dynamic>>()

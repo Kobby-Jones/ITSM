@@ -181,10 +181,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 titleIcon: Icons.info_outline_rounded,
                 child: Column(
                   children: [
-                    const _InfoTile(label: 'Application', value: 'ITSM Framework'),
+                    const _InfoTile(label: 'Application', value: 'FlowDesk'),
                     const _InfoTile(label: 'Version', value: '1.0.0 (build 142)'),
-                    const _InfoTile(label: 'Tenant', value: 'Goldfields Ghana Ltd'),
-                    const _InfoTile(label: 'Powered by', value: 'Deeptech AI'),
+                    const _InfoTile(label: 'Tenant', value: 'Newmont Ahafo'),
                     _ActionTile(
                       icon: Icons.description_rounded,
                       title: 'Terms of Service',

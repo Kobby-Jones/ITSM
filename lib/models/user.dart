@@ -38,6 +38,17 @@ class AppUser {
   /// `POST /auth/login`, `GET /auth/me`, or `GET /users/:id`.
   factory AppUser.fromJson(Map<String, dynamic> json) {
     final department = json['department'];
+    final role = json['role'];
+
+    // The backend returns `role` as a Map (with id, name, permissions)
+    // from list/detail endpoints, but as a String from login/me.
+    String? roleName;
+    if (role is Map) {
+      roleName = role['name'] as String?;
+    } else if (role is String) {
+      roleName = role;
+    }
+
     return AppUser(
       id: json['id'] as String,
       name: json['firstName'] != null
@@ -49,7 +60,7 @@ class AppUser {
           : (department as String? ?? ''),
       position: json['roleName'] as String? ?? json['position'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
-      role: UserRole.fromApi(json['role'] as String?),
+      role: UserRole.fromApi(roleName),
       avatarInitials: null,
       company: json['company'] as String? ?? 'ITSM Platform',
       location: json['location'] as String? ?? '',

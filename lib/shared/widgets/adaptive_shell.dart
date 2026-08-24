@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -535,11 +536,12 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            tooltip: online ? 'Simulate offline' : 'Simulate online',
-            icon: Icon(online ? Icons.cloud_off_rounded : Icons.cloud_rounded, size: 20),
-            onPressed: () => ref.read(connectivityProvider.notifier).toggle(),
-          ),
+          if (kDebugMode)
+            IconButton(
+              tooltip: online ? 'Simulate offline' : 'Simulate online',
+              icon: Icon(online ? Icons.cloud_off_rounded : Icons.cloud_rounded, size: 20),
+              onPressed: () => ref.read(connectivityProvider.notifier).toggle(),
+            ),
           IconButton(
             tooltip: 'Toggle theme',
             icon: Icon(

@@ -1,5 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,10 +14,10 @@ import '../../../core/utils/responsive.dart';
 import '../../../models/asset.dart';
 import '../../../models/kb_article.dart';
 import '../../../models/ticket.dart';
-import '../../../providers/assets_provider.dart';
 import '../../../providers/kb_provider.dart';
 import '../../../providers/tickets_provider.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/search_service.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../theme/app_colors.dart';
@@ -37,6 +39,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   static const _scopes = ['All', 'Tickets', 'Articles', 'Assets'];
 
+  // API-backed search state
+  Timer? _debounce;
+  SearchResults? _results;
+  bool _searching = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,43 +56,42 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void dispose() {
     _searchCtrl.dispose();
     _focus.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  bool _shouldInclude(String section) =>
-      _scope == 'All' || _scope == section;
+  void _onQueryChanged(String v) {
+    setState(() => _query = v);
+    _debounce?.cancel();
+    if (v.trim().isEmpty) {
+      setState(() { _results = null; _searching = false; });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), _performSearch);
+  }
+
+  Future<void> _performSearch() async {
+    final q = _query.trim();
+    if (q.isEmpty) return;
+    setState(() => _searching = true);
+    try {
+      final results = await SearchService.instance.search(
+        q,
+        scope: _scope == 'All' ? 'all' : _scope.toLowerCase(),
+      );
+      if (mounted) setState(() { _results = results; _searching = false; });
+    } catch (_) {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final tickets = ref.watch(ticketsProvider);
-    final articles = ref.watch(kbArticlesProvider);
-    final assets = ref.watch(assetsProvider);
+    final hasQuery = _query.trim().isNotEmpty;
 
-    final q = _query.trim().toLowerCase();
-    final hasQuery = q.isNotEmpty;
-
-    final ticketHits = !hasQuery || !_shouldInclude('Tickets')
-        ? <Ticket>[]
-        : tickets.where((t) =>
-            t.title.toLowerCase().contains(q) ||
-            t.description.toLowerCase().contains(q) ||
-            t.code.toLowerCase().contains(q) ||
-            t.reporterName.toLowerCase().contains(q)).take(10).toList();
-
-    final articleHits = !hasQuery || !_shouldInclude('Articles')
-        ? <KbArticle>[]
-        : articles.where((a) =>
-            a.title.toLowerCase().contains(q) ||
-            a.summary.toLowerCase().contains(q) ||
-            a.tags.any((t) => t.toLowerCase().contains(q))).take(10).toList();
-
-    final assetHits = !hasQuery || !_shouldInclude('Assets')
-        ? <Asset>[]
-        : assets.where((a) =>
-            a.name.toLowerCase().contains(q) ||
-            a.tag.toLowerCase().contains(q) ||
-            a.serialNumber.toLowerCase().contains(q) ||
-            a.currentUser.toLowerCase().contains(q)).take(10).toList();
+    final ticketHits = _results?.tickets ?? <Ticket>[];
+    final articleHits = _results?.articles ?? <KbArticle>[];
+    final assetHits = _results?.assets ?? <Asset>[];
 
     final totalHits = ticketHits.length + articleHits.length + assetHits.length;
 
@@ -116,7 +122,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: TextField(
                   controller: _searchCtrl,
                   focusNode: _focus,
-                  onChanged: (v) => setState(() => _query = v),
+                  onChanged: _onQueryChanged,
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: 'Search tickets, articles, assets…',
@@ -198,10 +204,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               Expanded(
                 child: !hasQuery
                     ? _SuggestionsPane(
-                        recentTickets: tickets.take(4).toList(),
-                        recentArticles: articles.take(4).toList(),
+                        recentTickets: ref.watch(ticketsProvider).take(4).toList(),
+                        recentArticles: ref.watch(kbArticlesProvider).take(4).toList(),
                       )
-                    : (totalHits == 0
+                    : _searching
+                        ? const Center(child: CircularProgressIndicator())
+                        : (totalHits == 0
                         ? const EmptyState(
                             icon: Icons.search_off_rounded,
                             title: 'No results found',
@@ -218,7 +226,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   color: AppColors.primary,
                                   children: [
                                     for (var i = 0; i < ticketHits.length; i++)
-                                      _TicketHit(ticket: ticketHits[i], query: q)
+                                      _TicketHit(ticket: ticketHits[i], query: _query)
                                           .animate(delay: (i * 18).ms)
                                           .fadeIn(duration: 180.ms),
                                   ],
@@ -231,7 +239,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   color: AppColors.info,
                                   children: [
                                     for (var i = 0; i < articleHits.length; i++)
-                                      _ArticleHit(article: articleHits[i], query: q)
+                                      _ArticleHit(article: articleHits[i], query: _query)
                                           .animate(delay: (i * 18).ms)
                                           .fadeIn(duration: 180.ms),
                                   ],
@@ -244,7 +252,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   color: AppColors.warning,
                                   children: [
                                     for (var i = 0; i < assetHits.length; i++)
-                                      _AssetHit(asset: assetHits[i], query: q)
+                                      _AssetHit(asset: assetHits[i], query: _query)
                                           .animate(delay: (i * 18).ms)
                                           .fadeIn(duration: 180.ms),
                                   ],

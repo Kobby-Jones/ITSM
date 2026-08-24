@@ -105,7 +105,7 @@ class AuthScaffold extends StatelessWidget {
                               _featureRow(Icons.insights_rounded, 'Real-time analytics & telemetry'),
                               const Spacer(),
                               Text(
-                                '© 2026 Goldfields Ghana Ltd. • Powered by Deeptech AI',
+                                '© 2026 FlowDesk. All rights reserved.',
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.6),
                                   fontSize: 12,

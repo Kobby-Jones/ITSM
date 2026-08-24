@@ -9,20 +9,20 @@ class MockKbData {
       KbArticle(
         id: 'kb-001',
         title: 'How to connect to the company VPN',
-        summary: 'Step-by-step guide for configuring and connecting to the Goldfields Ghana VPN on Windows and Android.',
+        summary: 'Step-by-step guide for configuring and connecting to the organization VPN on Windows and Android.',
         content: '''
-The Goldfields Ghana VPN provides secure access to internal resources when working off-site or from a non-trusted network.
+The organization VPN provides secure access to internal resources when working off-site or from a non-trusted network.
 
 ## Prerequisites
 
-- A valid Goldfields Ghana account (the same credentials you use for email).
+- A valid organization account (the same credentials you use for email).
 - Two-factor authentication configured.
 - The Cisco Secure Client (formerly AnyConnect) installed on your device.
 
 ## Connecting on Windows
 
 1. Open Cisco Secure Client from the Start Menu.
-2. In the connection field, enter `vpn.goldfields.gh` and click Connect.
+2. In the connection field, enter `vpn.example.com` and click Connect.
 3. Enter your username and password.
 4. Approve the push notification on your phone.
 5. The shield icon in the system tray will turn green when connected.
@@ -30,7 +30,7 @@ The Goldfields Ghana VPN provides secure access to internal resources when worki
 ## Connecting on Android
 
 1. Install Cisco Secure Client from the Play Store.
-2. Tap "Add New Connection" and enter `vpn.goldfields.gh`.
+2. Tap "Add New Connection" and enter `vpn.example.com`.
 3. Enter your credentials and approve 2FA.
 4. The connection will remain active in the background.
 
@@ -102,12 +102,12 @@ If the above does not help, raise a ticket — IT will need to reinstall the dri
         title: 'Setting up Outlook on a new device',
         summary: 'Configure your work email on Outlook for desktop and mobile.',
         content: '''
-Outlook auto-discovers most settings if you sign in with your Goldfields Ghana email.
+Outlook auto-discovers most settings if you sign in with your organization email.
 
 ## On Windows
 
 1. Open Outlook.
-2. Enter your email (e.g. firstname.lastname@goldfields.gh).
+2. Enter your email (e.g. firstname.lastname@example.com).
 3. Approve the 2FA prompt.
 4. Outlook will pull the settings automatically.
 
@@ -260,12 +260,12 @@ Usually 15-30 minutes once IT picks up the ticket. We treat this as P2.
         title: 'Onboarding checklist for new starters',
         summary: 'What IT does for a new starter, and what the line manager needs to provide.',
         content: '''
-This is the standard new-starter IT setup at Goldfields Ghana.
+This is the standard new-starter IT setup for the organization.
 
 ## What the line manager submits (at least 5 days before the start date)
 
 - Full name, role, department, location.
-- Email address (firstname.lastname@goldfields.gh).
+- Email address (firstname.lastname@example.com).
 - Any special software requirements (e.g. ArcGIS for geologists).
 - Hardware preference (laptop vs desktop).
 
@@ -341,7 +341,7 @@ If you receive a suspicious email, do not click any links or download attachment
 ## Reporting
 
 - In Outlook: click the "Report" button → "Phishing".
-- The email will be sent to security@goldfields.gh and removed from your inbox.
+- The email will be sent to security@example.com and removed from your inbox.
 
 ## What you should NOT do
 
@@ -352,7 +352,7 @@ If you receive a suspicious email, do not click any links or download attachment
 ## What to look out for
 
 - Urgency: "Your password expires in 1 hour."
-- Mismatch: sender name says "Goldfields IT" but address is gibberish@unknown.com.
+- Mismatch: sender name says "IT Support" but address is gibberish@unknown.com.
 - Unexpected attachments, especially zip files or invoices.
 - Links that hover-show a different URL than the visible text.
 

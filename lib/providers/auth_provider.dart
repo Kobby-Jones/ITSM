@@ -108,13 +108,10 @@ class AuthController extends StateNotifier<AuthState> {
         firstName: firstName,
         lastName: lastName,
       );
-      // Registration succeeds but the account needs email verification
-      // before it can log in (see backend PENDING_VERIFICATION status) —
-      // surface that instead of pretending we're now authenticated.
-      state = state.copyWith(
-        loading: false,
-        error: 'Account created! Check your email to verify it, then sign in.',
-      );
+      // Registration creates an ACTIVE account — log in immediately.
+      final user = await AuthService.instance.login(email, password);
+      LocalCacheService.instance.setCurrentUser(user.id);
+      state = AuthState(user: user, restoring: false);
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
     } catch (e) {

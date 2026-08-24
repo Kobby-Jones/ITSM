@@ -44,7 +44,7 @@ class BrandMark extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'ITSM Framework',
+                'FlowDesk',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: size * 0.42,

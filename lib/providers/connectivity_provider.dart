@@ -1,19 +1,19 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-/// Reflects the device's *actual* network reachability (Wi-Fi/cellular/
-/// ethernet vs none), backed by `connectivity_plus`. This replaced an
-/// earlier version that just held a manually-toggled boolean for demo
-/// purposes — every other provider now depends on this being real, since
-/// it's what decides whether writes go straight to the API or into the
-/// offline sync queue.
+/// Reflects the device's network reachability.
 ///
-/// Note: connectivity_plus reports *link* status, not whether the backend
-/// is actually reachable (e.g. Wi-Fi with no internet still reports
-/// connected). `ApiClient`'s NetworkException handling is the backstop for
-/// that case — a request can still fail and get queued even when this
-/// provider says "online".
+/// On **mobile** (Android/iOS) this uses `connectivity_plus` which
+/// reports link status reliably.
+///
+/// On **desktop** (Windows/macOS/Linux) and **web**, `connectivity_plus`
+/// frequently reports `none` incorrectly. For those platforms we default
+/// to `true` (online) and only flip to `false` when API calls actually
+/// fail — which is handled by the ApiClient's error mapping.
 class ConnectivityController extends StateNotifier<bool> {
   ConnectivityController() : super(true) {
     _init();
@@ -22,14 +22,27 @@ class ConnectivityController extends StateNotifier<bool> {
   StreamSubscription<List<ConnectivityResult>>? _sub;
   bool _manualOverride = false;
 
-  Future<void> _init() async {
-    final initial = await Connectivity().checkConnectivity();
-    state = _isOnline(initial);
+  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
-    _sub = Connectivity().onConnectivityChanged.listen((results) {
-      if (_manualOverride) return;
-      state = _isOnline(results);
-    });
+  Future<void> _init() async {
+    if (!_isMobile) {
+      // Desktop/web: trust we're online; API errors are the backstop.
+      state = true;
+      return;
+    }
+
+    try {
+      final initial = await Connectivity().checkConnectivity();
+      state = _isOnline(initial);
+
+      _sub = Connectivity().onConnectivityChanged.listen((results) {
+        if (_manualOverride) return;
+        state = _isOnline(results);
+      });
+    } catch (_) {
+      // connectivity_plus threw — assume online.
+      state = true;
+    }
   }
 
   bool _isOnline(List<ConnectivityResult> results) =>
@@ -53,4 +66,5 @@ class ConnectivityController extends StateNotifier<bool> {
 }
 
 final connectivityProvider =
-    StateNotifierProvider<ConnectivityController, bool>((ref) => ConnectivityController());
+    StateNotifierProvider<ConnectivityController, bool>(
+        (ref) => ConnectivityController());

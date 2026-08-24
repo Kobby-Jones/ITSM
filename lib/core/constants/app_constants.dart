@@ -1,8 +1,8 @@
 class AppConstants {
-  static const String appName = 'ITSM Framework';
+  static const String appName = 'FlowDesk';
   static const String appVersion = '1.0.0';
-  static const String companyName = 'Deeptech AI';
-  static const String defaultLogoText = 'ITSM';
+  static const String companyName = 'FlowDesk';
+  static const String defaultLogoText = 'FD';
 
   // Animation durations
   static const Duration shortAnimation = Duration(milliseconds: 200);

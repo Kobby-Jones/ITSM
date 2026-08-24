@@ -14,7 +14,28 @@ import '../../../models/ticket.dart';
 import '../../../providers/tickets_provider.dart';
 import '../../../routes/app_routes.dart';
 import '../../../theme/app_colors.dart';
-import '../../tickets/mock_ticket_data.dart';
+
+/// Empty placeholder when no telemetry data is available for a ticket.
+DeviceTelemetry _emptyTelemetry() => DeviceTelemetry(
+  deviceId: '',
+  deviceModel: 'No device data',
+  osVersion: 'N/A',
+  hostname: '',
+  ramTotalMb: 1,
+  ramUsedMb: 0,
+  cpuUsage: 0,
+  storageTotalGb: 1,
+  storageUsedGb: 0,
+  networkStatus: 'Unknown',
+  networkType: 'Unknown',
+  charging: false,
+  cpuTemperature: 0,
+  logs: const [],
+  collectedAt: DateTime(1970),
+  publicIp: '',
+  macAddress: '',
+  topProcesses: const [],
+);
 
 class TelemetryAnalysisScreen extends ConsumerStatefulWidget {
   final String ticketId;
@@ -44,7 +65,7 @@ class _TelemetryAnalysisScreenState extends ConsumerState<TelemetryAnalysisScree
     // `ticket.deviceId -> GET /telemetry/devices/:deviceId` lookup (if the
     // reporting device is known) or a backend addition that links telemetry
     // to tickets directly.
-    final tel = MockTelemetryData.forTicket(widget.ticketId);
+    final tel = _emptyTelemetry();
     final isDesktop = Responsive.isDesktop(context);
 
     return SingleChildScrollView(

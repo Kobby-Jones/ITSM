@@ -19,10 +19,13 @@ class AuthService {
         'password': password,
       });
       final data = res.data['data'] as Map<String, dynamic>;
+      final accessToken = data['accessToken'] as String;
+      final refreshToken = data['refreshToken'] as String;
       await SecureStorageService.instance.saveTokens(
-        accessToken: data['accessToken'] as String,
-        refreshToken: data['refreshToken'] as String,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
       );
+      ApiClient.debugAccessTokenLifetime(accessToken, source: 'login');
       final userJson = data['user'] as Map<String, dynamic>;
       await SecureStorageService.instance.saveUserId(userJson['id'] as String);
       return AppUser.fromJson(userJson);

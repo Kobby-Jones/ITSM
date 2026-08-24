@@ -62,8 +62,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           password: _password.text,
         );
     if (!mounted) return;
-    if (ref.read(authProvider).isAuthenticated) {
+    final auth = ref.read(authProvider);
+    if (auth.isAuthenticated) {
       context.go(AppRoutes.home);
+    } else if (auth.error != null) {
+      context.showSnack(auth.error!, error: true);
     }
   }
 
@@ -134,6 +137,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Required';
                 if (v.length < 8) return 'Min. 8 characters';
+                if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Include at least 1 uppercase letter';
+                if (!RegExp(r'[a-z]').hasMatch(v)) return 'Include at least 1 lowercase letter';
+                if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include at least 1 number';
+                if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(v)) return 'Include at least 1 special character';
                 return null;
               },
             ),

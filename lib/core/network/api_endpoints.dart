@@ -56,6 +56,9 @@ class ApiEndpoints {
   static const syncQueue = '/sync/queue';
   static const syncStatus = '/sync/status';
 
+  // Global search
+  static const search = '/search';
+
   // Analytics
   static const analyticsDashboard = '/analytics/dashboard';
   static const analyticsTrends = '/analytics/trends';

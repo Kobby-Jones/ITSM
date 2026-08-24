@@ -33,4 +33,13 @@ class AssetsService {
       throw ApiClient.instance.mapError(e);
     }
   }
+
+  Future<Asset> createAsset(Map<String, dynamic> data) async {
+    try {
+      final res = await _dio.post(ApiEndpoints.assets, data: data);
+      return Asset.fromJson(res.data['data'] as Map<String, dynamic>);
+    } catch (e) {
+      throw ApiClient.instance.mapError(e);
+    }
+  }
 }
