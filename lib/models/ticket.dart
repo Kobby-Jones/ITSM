@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -106,6 +108,24 @@ class Comment {
       isInternal: json['isInternal'] as bool? ?? false,
     );
   }
+
+  Map<String, dynamic> toCacheJson() => {
+        'id': id,
+        'authorName': authorName,
+        'authorRole': authorRole,
+        'content': content,
+        'createdAt': createdAt.toIso8601String(),
+        'isInternal': isInternal,
+      };
+
+  factory Comment.fromCacheJson(Map<String, dynamic> json) => Comment(
+        id: json['id'] as String,
+        authorName: json['authorName'] as String? ?? 'Unknown',
+        authorRole: json['authorRole'] as String? ?? '',
+        content: json['content'] as String? ?? '',
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        isInternal: json['isInternal'] as bool? ?? false,
+      );
 }
 
 class TicketEvent {
@@ -177,6 +197,45 @@ class TicketEvent {
         'OPEN' => (Icons.refresh_rounded, AppColors.statusOpen),
         _ => (Icons.update_rounded, AppColors.statusInProgress),
       };
+
+  Map<String, dynamic> toCacheJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'timestamp': timestamp.toIso8601String(),
+        'iconCodePoint': icon.codePoint,
+        'iconFontFamily': icon.fontFamily,
+        'iconFontPackage': icon.fontPackage,
+        'iconMatchTextDirection': icon.matchTextDirection,
+        'colorValue': color.value,
+        'actor': actor,
+      };
+
+  static IconData _iconFromCachedCodePoint(int? codePoint) {
+    if (codePoint == Icons.fiber_new_rounded.codePoint) return Icons.fiber_new_rounded;
+    if (codePoint == Icons.assignment_ind_rounded.codePoint) return Icons.assignment_ind_rounded;
+    if (codePoint == Icons.check_circle_rounded.codePoint) return Icons.check_circle_rounded;
+    if (codePoint == Icons.lock_rounded.codePoint) return Icons.lock_rounded;
+    if (codePoint == Icons.arrow_upward_rounded.codePoint) return Icons.arrow_upward_rounded;
+    if (codePoint == Icons.play_circle_rounded.codePoint) return Icons.play_circle_rounded;
+    if (codePoint == Icons.sync_rounded.codePoint) return Icons.sync_rounded;
+    if (codePoint == Icons.pause_circle_rounded.codePoint) return Icons.pause_circle_rounded;
+    if (codePoint == Icons.refresh_rounded.codePoint) return Icons.refresh_rounded;
+    if (codePoint == Icons.comment_rounded.codePoint) return Icons.comment_rounded;
+    if (codePoint == Icons.add_circle_rounded.codePoint) return Icons.add_circle_rounded;
+    if (codePoint == Icons.cloud_off_rounded.codePoint) return Icons.cloud_off_rounded;
+    return Icons.update_rounded;
+  }
+
+  factory TicketEvent.fromCacheJson(Map<String, dynamic> json) => TicketEvent(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? 'Updated',
+        description: json['description'] as String? ?? '',
+        timestamp: DateTime.parse(json['timestamp'] as String),
+        icon: _iconFromCachedCodePoint(json['iconCodePoint'] as int?),
+        color: Color(json['colorValue'] as int? ?? AppColors.statusInProgress.value),
+        actor: json['actor'] as String?,
+      );
 }
 
 class Attachment {
@@ -210,6 +269,30 @@ class Attachment {
     if (mimetype.contains('word')) return Icons.description_rounded;
     return Icons.insert_drive_file_rounded;
   }
+
+  Map<String, dynamic> toCacheJson() => {
+        'name': name,
+        'size': size,
+        'url': url,
+        'iconCodePoint': icon.codePoint,
+        'iconFontFamily': icon.fontFamily,
+        'iconFontPackage': icon.fontPackage,
+        'iconMatchTextDirection': icon.matchTextDirection,
+      };
+
+  static IconData _iconFromCachedCodePoint(int? codePoint) {
+    if (codePoint == Icons.image_rounded.codePoint) return Icons.image_rounded;
+    if (codePoint == Icons.picture_as_pdf_rounded.codePoint) return Icons.picture_as_pdf_rounded;
+    if (codePoint == Icons.description_rounded.codePoint) return Icons.description_rounded;
+    return Icons.insert_drive_file_rounded;
+  }
+
+  factory Attachment.fromCacheJson(Map<String, dynamic> json) => Attachment(
+        name: json['name'] as String? ?? 'file',
+        size: json['size'] as String? ?? '',
+        url: json['url'] as String?,
+        icon: _iconFromCachedCodePoint(json['iconCodePoint'] as int?),
+      );
 }
 
 enum SyncState { synced, pending, syncing, failed }
@@ -235,6 +318,7 @@ class Ticket {
   final List<TicketEvent> events;
   final List<Attachment> attachments;
   final String? deviceId;
+  final Map<String, dynamic>? telemetrySnapshot;
   final SyncState syncState;
   final String location;
 
@@ -259,6 +343,7 @@ class Ticket {
     this.events = const [],
     this.attachments = const [],
     this.deviceId,
+    this.telemetrySnapshot,
     this.syncState = SyncState.synced,
     required this.location,
   });
@@ -321,8 +406,83 @@ class Ticket {
               .toList() ??
           const [],
       deviceId: json['deviceId'] as String?,
+      telemetrySnapshot: json['telemetry'] is Map
+          ? Map<String, dynamic>.from(json['telemetry'] as Map)
+          : null,
       syncState: SyncState.synced,
       location: department?['name'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toCacheJson() => {
+        '_cacheFormat': 1,
+        'id': id,
+        'code': code,
+        'title': title,
+        'description': description,
+        'priority': priority.apiValue,
+        'status': status.apiValue,
+        'category': category.apiValue,
+        'impact': impact.name,
+        'reporterId': reporterId,
+        'reporterName': reporterName,
+        'reporterDepartment': reporterDepartment,
+        'assigneeId': assigneeId,
+        'assigneeName': assigneeName,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'slaDueAt': slaDueAt.toIso8601String(),
+        'comments': comments.map((c) => c.toCacheJson()).toList(),
+        'events': events.map((e) => e.toCacheJson()).toList(),
+        'attachments': attachments.map((a) => a.toCacheJson()).toList(),
+        'deviceId': deviceId,
+        'telemetrySnapshot': telemetrySnapshot,
+        'syncState': syncState.name,
+        'location': location,
+      };
+
+  factory Ticket.fromCacheJson(Map<String, dynamic> json) {
+    TicketImpact parseImpact(String? value) => TicketImpact.values.firstWhere(
+          (i) => i.name == value,
+          orElse: () => TicketImpact.individual,
+        );
+    SyncState parseSyncState(String? value) => SyncState.values.firstWhere(
+          (s) => s.name == value,
+          orElse: () => SyncState.synced,
+        );
+
+    return Ticket(
+      id: json['id'] as String,
+      code: json['code'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      priority: TicketPriority.fromApi(json['priority'] as String?),
+      status: TicketStatus.fromApi(json['status'] as String?),
+      category: TicketCategory.fromApi(json['category'] as String?),
+      impact: parseImpact(json['impact'] as String?),
+      reporterId: json['reporterId'] as String? ?? '',
+      reporterName: json['reporterName'] as String? ?? '',
+      reporterDepartment: json['reporterDepartment'] as String? ?? '',
+      assigneeId: json['assigneeId'] as String?,
+      assigneeName: json['assigneeName'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      slaDueAt: DateTime.parse(json['slaDueAt'] as String),
+      comments: (json['comments'] as List? ?? const [])
+          .map((c) => Comment.fromCacheJson(Map<String, dynamic>.from(c as Map)))
+          .toList(),
+      events: (json['events'] as List? ?? const [])
+          .map((e) => TicketEvent.fromCacheJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      attachments: (json['attachments'] as List? ?? const [])
+          .map((a) => Attachment.fromCacheJson(Map<String, dynamic>.from(a as Map)))
+          .toList(),
+      deviceId: json['deviceId'] as String?,
+      telemetrySnapshot: json['telemetrySnapshot'] is Map
+          ? Map<String, dynamic>.from(json['telemetrySnapshot'] as Map)
+          : null,
+      syncState: parseSyncState(json['syncState'] as String?),
+      location: json['location'] as String? ?? '',
     );
   }
 
@@ -347,6 +507,7 @@ class Ticket {
         'description': description,
         'category': category.apiValue,
         'priority': priority.apiValue,
+        'impact': impact.name.toUpperCase(),
         'tags': <String>[],
         // ignore: use_null_aware_elements
         if (offlineId != null) 'offlineId': offlineId,
@@ -359,6 +520,8 @@ class Ticket {
     DateTime? updatedAt,
     List<Comment>? comments,
     List<TicketEvent>? events,
+    String? deviceId,
+    Map<String, dynamic>? telemetrySnapshot,
     SyncState? syncState,
   }) {
     return Ticket(
@@ -381,7 +544,8 @@ class Ticket {
       comments: comments ?? this.comments,
       events: events ?? this.events,
       attachments: attachments,
-      deviceId: deviceId,
+      deviceId: deviceId ?? this.deviceId,
+      telemetrySnapshot: telemetrySnapshot ?? this.telemetrySnapshot,
       syncState: syncState ?? this.syncState,
       location: location,
     );

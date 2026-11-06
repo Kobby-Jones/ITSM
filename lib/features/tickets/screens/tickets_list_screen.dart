@@ -24,7 +24,7 @@ class TicketsListScreen extends ConsumerStatefulWidget {
 
 class _TicketsListScreenState extends ConsumerState<TicketsListScreen> {
   final _searchCtrl = TextEditingController();
-  bool _initialScopeApplied = false;
+  String? _initializedForUserKey;
 
   @override
   void dispose() {
@@ -37,15 +37,20 @@ class _TicketsListScreenState extends ConsumerState<TicketsListScreen> {
     final user = ref.watch(authProvider).user;
     if (user == null) return const SizedBox.shrink();
 
-    if (!_initialScopeApplied) {
-      _initialScopeApplied = true;
+    // Ticket/filter providers live above this screen, so their state can survive
+    // a logout/login cycle. Re-initialize the list whenever the authenticated
+    // user (or role) changes so an end-user "mine" filter cannot leak into an
+    // admin/technician session and hide tickets.
+    final userKey = '${user.id}:${user.role.name}';
+    if (_initializedForUserKey != userKey) {
+      _initializedForUserKey = userKey;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _searchCtrl.clear();
         final defaultScope = ref.read(defaultScopeForRoleProvider);
-        final filters = ref.read(ticketFiltersProvider);
-        if (filters.scope == TicketScope.all) {
-          ref.read(ticketFiltersProvider.notifier).state =
-              filters.copyWith(scope: defaultScope);
-        }
+        ref.read(ticketFiltersProvider.notifier).state =
+            TicketFilters(scope: defaultScope);
+        ref.read(ticketsProvider.notifier).load();
       });
     }
 

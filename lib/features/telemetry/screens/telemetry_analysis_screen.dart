@@ -13,6 +13,7 @@ import '../../../models/telemetry.dart';
 import '../../../models/ticket.dart';
 import '../../../providers/tickets_provider.dart';
 import '../../../routes/app_routes.dart';
+import '../../../services/telemetry_service.dart';
 import '../../../theme/app_colors.dart';
 
 /// Empty placeholder when no telemetry data is available for a ticket.
@@ -21,15 +22,15 @@ DeviceTelemetry _emptyTelemetry() => DeviceTelemetry(
   deviceModel: 'No device data',
   osVersion: 'N/A',
   hostname: '',
-  ramTotalMb: 1,
-  ramUsedMb: 0,
-  cpuUsage: 0,
-  storageTotalGb: 1,
-  storageUsedGb: 0,
+  ramTotalMb: null,
+  ramUsedMb: null,
+  cpuUsage: null,
+  storageTotalGb: null,
+  storageUsedGb: null,
   networkStatus: 'Unknown',
   networkType: 'Unknown',
   charging: false,
-  cpuTemperature: 0,
+  cpuTemperature: null,
   logs: const [],
   collectedAt: DateTime(1970),
   publicIp: '',
@@ -47,25 +48,64 @@ class TelemetryAnalysisScreen extends ConsumerStatefulWidget {
 
 class _TelemetryAnalysisScreenState extends ConsumerState<TelemetryAnalysisScreen> {
   String _logFilter = 'ALL';
+  DeviceTelemetry? _telemetry;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTelemetry();
+  }
+
+  Ticket? _findTicket(List<Ticket> tickets) {
+    for (final ticket in tickets) {
+      if (ticket.id == widget.ticketId || ticket.code == widget.ticketId) {
+        return ticket;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _loadTelemetry() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    final ticket = _findTicket(ref.read(ticketsProvider));
+    try {
+      final telemetry = await TelemetryService.instance.getForTicket(
+        ticket?.id ?? widget.ticketId,
+        localSnapshot: ticket?.telemetrySnapshot,
+      );
+      if (!mounted) return;
+      setState(() {
+        _telemetry = telemetry;
+        _loading = false;
+        if (telemetry == null) {
+          _error = 'No telemetry snapshot is linked to this ticket yet.';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final tickets = ref.watch(ticketsProvider);
-    Ticket? ticket;
-    for (final t in tickets) {
-      if (t.id == widget.ticketId || t.code == widget.ticketId) {
-        ticket = t;
-        break;
-      }
-    }
-    // NOTE: still mock data. The backend's telemetry endpoints
-    // (`GET /telemetry/devices/:deviceId`) are keyed by device, not by
-    // ticket — there's no "device diagnostics for this specific ticket"
-    // endpoint today. Wiring this properly needs either a
-    // `ticket.deviceId -> GET /telemetry/devices/:deviceId` lookup (if the
-    // reporting device is known) or a backend addition that links telemetry
-    // to tickets directly.
-    final tel = _emptyTelemetry();
+    final ticket = _findTicket(tickets);
+    final tel = _telemetry ??
+        (ticket?.telemetrySnapshot != null
+            ? DeviceTelemetry.fromJson(ticket!.telemetrySnapshot!)
+            : _emptyTelemetry());
     final isDesktop = Responsive.isDesktop(context);
 
     return SingleChildScrollView(
@@ -76,28 +116,70 @@ class _TelemetryAnalysisScreenState extends ConsumerState<TelemetryAnalysisScree
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Header(ticketCode: ticket?.code ?? widget.ticketId, ticketId: ticket?.id ?? widget.ticketId),
+              _Header(
+                ticketCode: ticket?.code ?? widget.ticketId,
+                ticketId: ticket?.id ?? widget.ticketId,
+                onRefresh: _loadTelemetry,
+              ),
               const SizedBox(height: 20),
-              _DeviceInfoCard(tel: tel),
-              const SizedBox(height: 16),
-              _MetricsGrid(tel: tel, isDesktop: isDesktop),
-              const SizedBox(height: 16),
-              isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 5, child: _LogsCard(tel: tel, filter: _logFilter, onFilter: (v) => setState(() => _logFilter = v))),
-                        const SizedBox(width: 16),
-                        Expanded(flex: 3, child: _ProcessesCard(tel: tel)),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _LogsCard(tel: tel, filter: _logFilter, onFilter: (v) => setState(() => _logFilter = v)),
-                        const SizedBox(height: 16),
-                        _ProcessesCard(tel: tel),
-                      ],
+              if (_loading)
+                const LinearProgressIndicator()
+              else if (_error != null && _telemetry == null &&
+                  ticket?.telemetrySnapshot == null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.25),
                     ),
+                  ),
+                  child: Text(_error!),
+                ),
+              if (_loading ||
+                  _telemetry != null ||
+                  ticket?.telemetrySnapshot != null) ...[
+                if (!_loading) _DeviceInfoCard(tel: tel),
+                if (!_loading) const SizedBox(height: 16),
+                if (!_loading) _MetricsGrid(tel: tel, isDesktop: isDesktop),
+                if (!_loading && tel.unavailable.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _UnavailableNote(tel: tel),
+                ],
+                if (!_loading) const SizedBox(height: 16),
+                if (!_loading)
+                  (isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: _LogsCard(
+                                tel: tel,
+                                filter: _logFilter,
+                                onFilter: (v) =>
+                                    setState(() => _logFilter = v),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(flex: 3, child: _ProcessesCard(tel: tel)),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _LogsCard(
+                              tel: tel,
+                              filter: _logFilter,
+                              onFilter: (v) =>
+                                  setState(() => _logFilter = v),
+                            ),
+                            const SizedBox(height: 16),
+                            _ProcessesCard(tel: tel),
+                          ],
+                        )),
+              ],
               const SizedBox(height: 24),
             ],
           ),
@@ -110,7 +192,12 @@ class _TelemetryAnalysisScreenState extends ConsumerState<TelemetryAnalysisScree
 class _Header extends StatelessWidget {
   final String ticketCode;
   final String ticketId;
-  const _Header({required this.ticketCode, required this.ticketId});
+  final VoidCallback onRefresh;
+  const _Header({
+    required this.ticketCode,
+    required this.ticketId,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +228,7 @@ class _Header extends StatelessWidget {
           ),
         ),
         OutlinedButton.icon(
-          onPressed: () => context.showSnack('Refreshed telemetry.'),
+          onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded, size: 16),
           label: const Text('Refresh'),
         ),
@@ -175,11 +262,14 @@ class _DeviceInfoCard extends StatelessWidget {
         runSpacing: 16,
         children: [
           _info(context, 'Device', tel.deviceModel, Icons.laptop_mac_rounded),
-          _info(context, 'Hostname', tel.hostname, Icons.dns_rounded),
+          if (tel.hostname.isNotEmpty)
+            _info(context, 'Hostname', tel.hostname, Icons.dns_rounded),
           _info(context, 'OS', tel.osVersion, Icons.desktop_windows_rounded),
-          _info(context, 'Asset tag', tel.deviceId, Icons.qr_code_2_rounded),
-          _info(context, 'IP address', tel.publicIp, Icons.lan_rounded),
-          _info(context, 'MAC', tel.macAddress, Icons.settings_ethernet_rounded),
+          _info(context, 'Device ID', tel.deviceId, Icons.qr_code_2_rounded),
+          if (tel.publicIp.isNotEmpty)
+            _info(context, 'IP address', tel.publicIp, Icons.lan_rounded),
+          if (tel.macAddress.isNotEmpty)
+            _info(context, 'MAC', tel.macAddress, Icons.settings_ethernet_rounded),
           _info(context, 'Collected', Formatters.dateTime(tel.collectedAt), Icons.schedule_rounded),
         ],
       ),
@@ -224,26 +314,45 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A null metric was not captured by the client: show "N/A" and why,
+    // never a zero that looks like a real reading.
+    final cpu = tel.cpuUsage;
+    final cpuTemp = tel.cpuTemperature;
+    final ramUsed = tel.ramUsedMb;
+    final ramTotal = tel.ramTotalMb;
+    final storageUsed = tel.storageUsedGb;
+    final storageTotal = tel.storageTotalGb;
+
     final cards = [
       _GaugeCard(
         title: 'CPU',
-        value: tel.cpuUsage,
-        valueLabel: '${(tel.cpuUsage * 100).toStringAsFixed(0)}%',
-        sublabel: 'Temp ${tel.cpuTemperature.toStringAsFixed(1)}°C',
+        value: cpu,
+        valueLabel: cpu == null ? 'N/A' : '${(cpu * 100).toStringAsFixed(0)}%',
+        sublabel: cpu == null
+            ? 'Not captured'
+            : (cpuTemp == null
+                ? 'Temp N/A'
+                : 'Temp ${cpuTemp.toStringAsFixed(1)}°C'),
         icon: Icons.memory_rounded,
       ),
       _GaugeCard(
         title: 'Memory',
         value: tel.ramUsage,
-        valueLabel: '${(tel.ramUsedMb / 1024).toStringAsFixed(1)} GB',
-        sublabel: 'of ${(tel.ramTotalMb / 1024).toStringAsFixed(0)} GB',
+        valueLabel: ramUsed == null
+            ? 'N/A'
+            : '${(ramUsed / 1024).toStringAsFixed(1)} GB',
+        sublabel: ramTotal == null
+            ? 'Not captured'
+            : 'of ${(ramTotal / 1024).toStringAsFixed(0)} GB',
         icon: Icons.developer_board_rounded,
       ),
       _GaugeCard(
         title: 'Storage',
         value: tel.storageUsage,
-        valueLabel: '${tel.storageUsedGb} GB',
-        sublabel: 'of ${tel.storageTotalGb} GB',
+        valueLabel: storageUsed == null ? 'N/A' : '$storageUsed GB',
+        sublabel: storageTotal == null
+            ? 'Not captured'
+            : 'of $storageTotal GB',
         icon: Icons.storage_rounded,
       ),
       _NetworkCard(tel: tel),
@@ -265,9 +374,57 @@ class _MetricsGrid extends StatelessWidget {
   }
 }
 
+/// Explains, in one place, which readings the client could not capture and
+/// why, so a blank gauge is never mistaken for a collection bug or a real zero.
+class _UnavailableNote extends StatelessWidget {
+  final DeviceTelemetry tel;
+  const _UnavailableNote({required this.tel});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = {'cpu': 'CPU', 'memory': 'Memory', 'storage': 'Storage'};
+    final lines = <String>[
+      for (final entry in labels.entries)
+        if (tel.unavailable.containsKey(entry.key))
+          '${entry.value}: ${tel.unavailable[entry.key]}',
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.info.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.info.withOpacity(0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              size: 16, color: AppColors.info),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Not captured on this device — ${lines.join(' · ')}',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: context.colors.onSurface.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GaugeCard extends StatelessWidget {
   final String title;
-  final double value;
+
+  /// 0..1, or null when the metric was not captured.
+  final double? value;
   final String valueLabel;
   final String sublabel;
   final IconData icon;
@@ -288,7 +445,10 @@ class _GaugeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _color(value);
+    final reading = value;
+    final color = reading == null
+        ? context.colors.onSurface.withOpacity(0.35)
+        : _color(reading);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -319,7 +479,9 @@ class _GaugeCard extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
+                    tween: Tween<double>(
+                        begin: 0,
+                        end: (reading ?? 0.0).clamp(0.0, 1.0).toDouble()),
                     duration: const Duration(milliseconds: 700),
                     curve: Curves.easeOutCubic,
                     builder: (_, v, __) => SizedBox(
@@ -668,7 +830,22 @@ class _ProcessesCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
+          if (tel.topProcesses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: Text(
+                  'Per-process telemetry is not exposed by this client platform.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colors.onSurface.withOpacity(0.55),
+                  ),
+                ),
+              ),
+            )
+          else
+            SizedBox(
             height: 200,
             child: BarChart(
               BarChartData(

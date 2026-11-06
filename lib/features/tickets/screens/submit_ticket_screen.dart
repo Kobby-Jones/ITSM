@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/extensions/context_extensions.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/ticket.dart';
 import '../../../providers/auth_provider.dart';
@@ -78,33 +79,45 @@ class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
 
     setState(() => _submitting = true);
 
-    // Collect device telemetry if the user opted in.
-    Map<String, dynamic>? telemetryData;
-    if (_includeTelemetry) {
-      final snapshot =
-          await TelemetryCollectionService.instance.collectSnapshot();
-      telemetryData = snapshot?.toJson();
-    }
+    try {
+      // Collect device telemetry at the moment the ticket is raised, if the
+      // user opted in. The collector never throws and is time-boxed, so a
+      // slow or failing metric cannot block or lose the ticket.
+      Map<String, dynamic>? telemetryData;
+      if (_includeTelemetry) {
+        final snapshot =
+            await TelemetryCollectionService.instance.collectSnapshot();
+        telemetryData = snapshot?.toJson();
+      }
 
-    final ticket = await ref.read(ticketsProvider.notifier).submit(
-          reporter: user,
-          title: _title.text.trim(),
-          description: _desc.text.trim(),
-          priority: _priority,
-          category: _category!,
-          impact: _impact,
-          isOnline: isOnline,
-          attachments: List.of(_attachments),
-          telemetry: telemetryData,
-        );
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    context.showSnack(
-      isOnline
-          ? 'Ticket ${ticket.code} submitted.'
-          : 'Ticket ${ticket.code} queued for sync.',
-    );
-    context.go(AppRoutes.ticketDetailFor(ticket.id));
+      final ticket = await ref.read(ticketsProvider.notifier).submit(
+            reporter: user,
+            title: _title.text.trim(),
+            description: _desc.text.trim(),
+            priority: _priority,
+            category: _category!,
+            impact: _impact,
+            isOnline: isOnline,
+            attachments: List.of(_attachments),
+            telemetry: telemetryData,
+          );
+      if (!mounted) return;
+      context.showSnack(
+        isOnline
+            ? 'Ticket ${ticket.code} submitted.'
+            : 'Ticket ${ticket.code} queued for sync.',
+      );
+      context.go(AppRoutes.ticketDetailFor(ticket.id));
+    } catch (e) {
+      if (!mounted) return;
+      context.showSnack(
+        e is ApiException ? e.message : 'Could not submit the ticket. Please try again.',
+        error: true,
+      );
+    } finally {
+      // Previously a failed create left the spinner on forever.
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override

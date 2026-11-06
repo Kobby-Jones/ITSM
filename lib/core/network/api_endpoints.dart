@@ -82,4 +82,5 @@ class ApiEndpoints {
   static const telemetryDevices = '/telemetry/devices';
   static String telemetryForDevice(String deviceId) => '/telemetry/devices/$deviceId';
   static String telemetryLogsForDevice(String deviceId) => '/telemetry/devices/$deviceId/logs';
+  static String telemetryForTicket(String ticketId) => '/telemetry/tickets/$ticketId';
 }

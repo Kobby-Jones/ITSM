@@ -164,7 +164,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           _ActionsCard(ticket: ticket, user: user),
           const SizedBox(height: 16),
         ],
-        if (ticket.deviceId != null) _TelemetryPreviewCard(ticket: ticket),
+        _TelemetryPreviewCard(ticket: ticket),
       ],
     );
   }
@@ -850,8 +850,7 @@ class _ActionsCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
           ],
-          if (ticket.deviceId != null)
-            OutlinedButton.icon(
+          OutlinedButton.icon(
               onPressed: () =>
                   context.go(AppRoutes.telemetryFor(ticket.id)),
               icon: const Icon(Icons.monitor_heart_rounded, size: 16),
@@ -912,18 +911,39 @@ class _TelemetryPreviewCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'No telemetry snapshot was collected when this ticket was created.',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: context.colors.onSurface.withOpacity(0.5),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ticket.telemetrySnapshot != null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ticket.telemetrySnapshot!['deviceModel']?.toString() ??
+                            'Device snapshot captured',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${ticket.telemetrySnapshot!['osVersion'] ?? 'Unknown OS'} • '
+                        '${ticket.telemetrySnapshot!['networkType'] ?? 'unknown network'} • '
+                        '${ticket.telemetrySnapshot!['batteryLevel'] != null ? '${ticket.telemetrySnapshot!['batteryLevel']}% battery' : 'battery N/A'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.colors.onSurface.withOpacity(0.58),
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Open the full view to load the telemetry snapshot linked to this ticket.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: context.colors.onSurface.withOpacity(0.5),
+                    ),
+                  ),
           ),
         ],
       ),

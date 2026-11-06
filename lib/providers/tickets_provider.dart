@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/network/api_exception.dart';
+import '../core/storage/sync_queue_service.dart';
 import '../models/ticket.dart';
 import '../models/user.dart';
 import '../models/user_role.dart';
 import '../services/tickets_service.dart';
 import '../services/sync_service.dart';
+import '../services/telemetry_service.dart';
 import '../theme/app_colors.dart';
 import 'auth_provider.dart';
 import 'connectivity_provider.dart';
@@ -93,7 +97,9 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       final result = await TicketsService.instance.getTicketsPaginated(page: 1);
       state = result.tickets;
       _totalServerCount = result.total;
-      loadState = TicketsLoadState.loaded;
+      loadState = _ref.read(connectivityProvider)
+          ? TicketsLoadState.loaded
+          : TicketsLoadState.offlineCached;
     } catch (e) {
       loadError = e.toString();
       loadState = TicketsLoadState.error;
@@ -130,6 +136,11 @@ class TicketsController extends StateNotifier<List<Ticket>> {
   /// the in-memory list. This gives the detail screen fresh comments,
   /// attachments, history and SLA data.
   Future<Ticket> fetchById(String id) async {
+    if (!_ref.read(connectivityProvider)) {
+      final local = byId(id);
+      if (local != null) return local;
+    }
+
     final ticket = await TicketsService.instance.getTicketById(id);
     // Replace the stale list version (if present) with the full detail.
     final exists = state.any((t) => t.id == id || t.code == id);
@@ -137,6 +148,7 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       _replace(id, (_) => ticket);
     } else {
       state = [ticket, ...state];
+      _persistState();
     }
     return ticket;
   }
@@ -146,15 +158,22 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       for (final t in state)
         if (t.id == id || t.code == id) update(t) else t,
     ];
+    unawaited(TicketsService.instance.persistTickets(state));
+  }
+
+  void _persistState() {
+    unawaited(TicketsService.instance.persistTickets(state));
   }
 
   void updateStatus(String id, TicketStatus status, {String? actor}) {
     final now = DateTime.now();
+    final online = _ref.read(connectivityProvider);
     _replace(
       id,
       (t) => t.copyWith(
         status: status,
         updatedAt: now,
+        syncState: online ? t.syncState : SyncState.pending,
         events: [
           ...t.events,
           TicketEvent(
@@ -169,24 +188,41 @@ class TicketsController extends StateNotifier<List<Ticket>> {
         ],
       ),
     );
-    TicketsService.instance.updateStatus(id, status).catchError((_) {
-      // Optimistic update already applied; a background retry happens via
-      // the sync queue if this was a connectivity failure. Non-network
-      // errors (e.g. permission denied) are swallowed here rather than
-      // silently reverting — surfacing them well would need a dedicated
-      // error-toast channel, a good next step.
-      return TicketsService.instance.getTicketById(id).catchError((_) => byId(id)!);
-    });
+
+    if (!online) {
+      unawaited(TicketsService.instance.queueStatus(id, status));
+      return;
+    }
+
+    unawaited(_sendStatus(id, status));
   }
 
-  void assign(String id, {required String assigneeId, required String assigneeName, String? actor}) {
+  Future<void> _sendStatus(String id, TicketStatus status) async {
+    try {
+      await TicketsService.instance.updateStatus(id, status);
+    } on NetworkException {
+      _replace(id, (t) => t.copyWith(syncState: SyncState.pending));
+    } catch (_) {
+      // Keep the optimistic local view. Authorization/validation failures are
+      // not queued by the service and can be reconciled on the next refresh.
+    }
+  }
+
+  void assign(
+    String id, {
+    required String assigneeId,
+    required String assigneeName,
+    String? actor,
+  }) {
     final now = DateTime.now();
+    final online = _ref.read(connectivityProvider);
     _replace(
       id,
       (t) => t.copyWith(
         assigneeId: assigneeId,
         assigneeName: assigneeName,
         updatedAt: now,
+        syncState: online ? t.syncState : SyncState.pending,
         events: [
           ...t.events,
           TicketEvent(
@@ -201,11 +237,31 @@ class TicketsController extends StateNotifier<List<Ticket>> {
         ],
       ),
     );
-    TicketsService.instance.assign(id, assigneeId).catchError((_) => byId(id)!);
+
+    if (!online) {
+      unawaited(TicketsService.instance.queueAssignment(id, assigneeId));
+      return;
+    }
+
+    unawaited(_sendAssignment(id, assigneeId));
   }
 
-  void addComment(String id, {required AppUser author, required String content, bool internal = false}) {
+  Future<void> _sendAssignment(String id, String assigneeId) async {
+    try {
+      await TicketsService.instance.assign(id, assigneeId);
+    } on NetworkException {
+      _replace(id, (t) => t.copyWith(syncState: SyncState.pending));
+    } catch (_) {}
+  }
+
+  void addComment(
+    String id, {
+    required AppUser author,
+    required String content,
+    bool internal = false,
+  }) {
     final now = DateTime.now();
+    final online = _ref.read(connectivityProvider);
     _replace(
       id,
       (t) => t.copyWith(
@@ -221,13 +277,17 @@ class TicketsController extends StateNotifier<List<Ticket>> {
           ),
         ],
         updatedAt: now,
+        syncState: online ? t.syncState : SyncState.pending,
         events: [
           ...t.events,
           TicketEvent(
             id: 'evt-${_uuid.v4()}',
             title: '${author.name} commented',
-            description:
-                internal ? 'Internal note added' : content.length > 60 ? '${content.substring(0, 60)}…' : content,
+            description: internal
+                ? 'Internal note added'
+                : content.length > 60
+                    ? '${content.substring(0, 60)}…'
+                    : content,
             timestamp: now,
             icon: Icons.comment_rounded,
             color: AppColors.info,
@@ -236,14 +296,31 @@ class TicketsController extends StateNotifier<List<Ticket>> {
         ],
       ),
     );
-    TicketsService.instance.addComment(id, content, isInternal: internal).catchError((_) => Comment(
-          id: 'pending',
-          authorName: author.name,
-          authorRole: author.role.label,
-          content: content,
-          createdAt: now,
+
+    if (!online) {
+      unawaited(
+        TicketsService.instance.queueComment(
+          id,
+          content,
           isInternal: internal,
-        ));
+        ),
+      );
+      return;
+    }
+
+    unawaited(_sendComment(id, content, internal));
+  }
+
+  Future<void> _sendComment(String id, String content, bool internal) async {
+    try {
+      await TicketsService.instance.addComment(
+        id,
+        content,
+        isInternal: internal,
+      );
+    } on NetworkException {
+      _replace(id, (t) => t.copyWith(syncState: SyncState.pending));
+    } catch (_) {}
   }
 
   /// Submits a new ticket. If offline, [TicketsService] queues it locally
@@ -279,6 +356,8 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       updatedAt: now,
       slaDueAt: now.add(Duration(hours: priority.slaHours)),
       attachments: attachments,
+      deviceId: telemetry?['deviceId']?.toString(),
+      telemetrySnapshot: telemetry,
       location: reporter.location,
       syncState: isOnline ? SyncState.synced : SyncState.pending,
       events: [
@@ -307,8 +386,14 @@ class TicketsController extends StateNotifier<List<Ticket>> {
       draft,
       offlineId: offlineId,
       telemetry: telemetry,
+      offline: !isOnline,
     );
     state = [result, ...state];
+    _persistState();
+    // Remember what this device captured under both the local and server ids,
+    // so the creator can always open it from the ticket.
+    unawaited(TelemetryService.instance
+        .rememberLocal([offlineId, result.id], telemetry));
     return result;
   }
 
@@ -400,7 +485,10 @@ final defaultScopeForRoleProvider = Provider<TicketScope>((ref) {
     case UserRole.endUser:
       return TicketScope.mine;
     case UserRole.technician:
-      return TicketScope.assignedToMe;
+      // Technicians need visibility of newly submitted tickets even when the
+      // routing engine assigns them to a different technician. "Assigned to
+      // me" remains available as an explicit tab for focused work.
+      return TicketScope.all;
     case UserRole.admin:
     case UserRole.manager:
       return TicketScope.all;
@@ -419,10 +507,39 @@ final syncQueueTicketsProvider = Provider<List<Ticket>>((ref) {
 /// state (ids, ticket numbers, etc). Watch this provider once near the root
 /// of the authenticated shell (see `adaptive_shell.dart`) to activate it.
 final autoSyncProvider = Provider<void>((ref) {
-  ref.listen<bool>(connectivityProvider, (prev, next) async {
-    if (prev == false && next == true) {
-      await SyncService.instance.processQueue();
-      await ref.read(ticketsProvider.notifier).load();
+  var syncing = false;
+
+  Future<void> syncIfNeeded(bool online) async {
+    if (!online || syncing || SyncQueueService.instance.pendingCount == 0) {
+      return;
     }
+
+    syncing = true;
+    try {
+      final synced = await SyncService.instance.processQueue();
+      if (synced > 0) {
+        await ref.read(ticketsProvider.notifier).load();
+      }
+    } finally {
+      syncing = false;
+    }
+  }
+
+  // Flush work left from a previous app session when the authenticated shell
+  // first mounts while already online.
+  Future.microtask(() => syncIfNeeded(ref.read(connectivityProvider)));
+
+  // React immediately to Android's connectivity transitions.
+  ref.listen<bool>(connectivityProvider, (prev, next) {
+    unawaited(syncIfNeeded(next));
   });
+
+  // Connectivity APIs report link state, not guaranteed internet reachability.
+  // If Wi-Fi remains connected while the WAN is down, there may be no later
+  // offline->online event. Retry only while queued work exists so restoration
+  // of real internet access still triggers eventual synchronization.
+  final retryTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    unawaited(syncIfNeeded(ref.read(connectivityProvider)));
+  });
+  ref.onDispose(retryTimer.cancel);
 });
